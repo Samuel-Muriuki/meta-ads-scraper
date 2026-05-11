@@ -69,10 +69,10 @@ python -m meta_ads_scraper resume <run-id>
 | Path | Purpose |
 |---|---|
 | `PLANNING-BRIEF.md` | Architectural decisions — **read first** |
-| `BUILD-PLAN.md` | Phase-by-phase build prompts for  |
-| `.project/ENGINEERING-MANUAL.md` |  operating manual |
+| `BUILD-PLAN.md` | Phase-by-phase implementation prompts |
+| `.project/ENGINEERING-MANUAL.md` | Engineering manual — coding standards, git discipline, project ops |
 | `.project/journal/JOURNAL.md` | Current build phase state and recent decisions |
-| `.project/patterns/` | Reusable patterns for  (Playwright, Pydantic, pytest) |
+| `.project/patterns/` | Reusable patterns (Playwright, Pydantic, pytest) |
 | `docs/architecture/` | Subsystem deep-dive documentation (11 docs) |
 | `docs/contracts/ad-data-schema.md` | The `Ad` Pydantic model contract — the data schema |
 | `docs/conventions/` | Code style, commit format, testing discipline |
@@ -81,15 +81,6 @@ python -m meta_ads_scraper resume <run-id>
 | `tests/` | Unit + integration tests |
 | `examples/` | Real-world sample output files (CSV + JSON) |
 | `bootstrap.sh` | One-shot project setup script |
-
-## Why `docs/` and `.project/` are committed
-
-These folders hold the architectural documentation and engineering context that make this project understandable to future contributors and reviewable by anyone reading the repo. They are deliberately public:
-
-- `docs/` — Human-readable architecture, conventions, and contracts. Read these to understand *why* the code is structured the way it is.
-- `.project/` — Operating context for internal tooling. Includes coding conventions, current phase state, and reusable skill modules.
-
-Both folders are intentional repo artefacts, not local-only config.
 
 ## Stack
 
@@ -111,7 +102,7 @@ See `PLANNING-BRIEF.md` §3 for the full rationale.
 
 ## Development workflow
 
-This project follows a phase-gated build pattern. Each phase is a discrete focused implementation session with a specific prompt from `BUILD-PLAN.md`. Phases are not combined; each ships as its own pull request from `develop` to `main`.
+This project follows a phase-gated build pattern. Each phase is a discrete, focused implementation session driven by the prompt for that phase in `BUILD-PLAN.md`. Phases are not combined; each ships as its own pull request from `develop` to `main`.
 
 Commits follow [gitmoji](https://gitmoji.dev/) conventions with mandatory scopes — see `docs/conventions/COMMIT-FORMAT.md`.
 

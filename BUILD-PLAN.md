@@ -1,11 +1,10 @@
 # Meta Ads Scraper — Build Plan
 
-> **How to use this file:** Each phase is one focused implementation session. Work through the prompt, review the diff, commit, move on. Do not skip phases. Do not combine phases.
+> **How to use this file:** Each phase is one focused implementation session. Work through the prompt for the phase, review the diff, commit, move on. Do not skip phases. Do not combine phases.
 
 **Prerequisites before Phase 0:**
 - This repo is cloned/extracted on your machine
 - You are in the repo root
-- Python toolchain is set up
 - You have Python 3.11+ available
 - You have Node.js available (for Playwright browsers install)
 

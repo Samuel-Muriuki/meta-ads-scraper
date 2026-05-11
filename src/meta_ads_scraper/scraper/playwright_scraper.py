@@ -85,7 +85,7 @@ class PlaywrightScraper(BaseScraper):
         if self._page is None:
             raise RuntimeError("PlaywrightScraper not entered — use `async with`")
         page = self._page
-        url = resolve_url(spec)
+        url = await resolve_url(spec)
         logger.info("scrape_start", url=url, mode=spec.mode, query=spec.query)
 
         await page.goto(url, wait_until="domcontentloaded", timeout=_DEFAULT_NAV_TIMEOUT)

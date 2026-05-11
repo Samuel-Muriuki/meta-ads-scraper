@@ -8,9 +8,12 @@
 
 **Phase 1 — MVP Single Keyword Search** (not yet started)
 
-**Develop tip:** `9e1f511` — `🧪 test: integration smoke for package distribution`
-**Last commit:** 2026-05-11 — Phase 0 closeout
-**CI status:** ✅ green — https://github.com/Samuel-Muriuki/meta-ads-scraper/actions/runs/25661199881
+**Develop tip:** `620cc07` — `📝 docs(readme): align CI badge with PROJECT-TEMPLATE format (branch=main)`
+**Main tip:** `3abfb3d` — `Merge pull request #1 from Samuel-Muriuki/develop` (Phase 0 boundary)
+**Last commit:** 2026-05-11 — Phase 0 closeout merged via [PR #1](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/1)
+**CI status:** ✅ green on both branches
+  - main: https://github.com/Samuel-Muriuki/meta-ads-scraper/actions/runs/25662863044
+  - develop: https://github.com/Samuel-Muriuki/meta-ads-scraper/actions/runs/25661828608
 **Open PRs:** (none)
 
 ---
@@ -19,9 +22,12 @@
 
 ### 2026-05-11 — Phase 0 closeout
 
+- **PR merge strategy: always `--merge`, never squash.** For every PR (feature→develop, develop→main), use `gh pr merge <N> --merge` to preserve atomic gitmoji history and add a boundary marker commit. Established during the Phase 0 closeout PR — Samuel: "follow that going forward!!!". Also captured in shared notes at `~/.project/projects/.../memory/feedback_merge_strategy.md`.
+- **Phase 0 closed via [PR #1](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/1).** 8 atomic commits, merged with `--merge` strategy → main at `3abfb3d`. Post-merge CI green on main.
 - **Coverage gate deferred to Phase 6.** `--cov-fail-under=60` was removed from `pyproject.toml` `addopts` because the empty Phase 0 scaffold would have it fail unconditionally. BUILD-PLAN.md already schedules the coverage gate at Phase 6 ("expand unit coverage"), so this is a deferral, not a change of intent. Coverage reports themselves remain on.
 - **Two smoke tests added at Phase 0.** `tests/unit/test_package.py` (asserts `__version__` is exposed) and `tests/integration/test_smoke.py` (asserts distribution metadata is present). Both exist primarily to keep pytest from returning exit-5 ("no tests collected") on the empty scaffold while still being real tests that catch packaging breakage. They'll stay as packaging guards even after Phase 1+ tests land.
 - **`__version__` sourced from installed distribution.** `src/meta_ads_scraper/__init__.py` reads via `importlib.metadata.version("meta-ads-scraper")`, keeping `pyproject.toml` as the single source of truth.
+- **Funding/sponsor surface added per `PROJECT-TEMPLATE` §4.3.** `.github/FUNDING.yml` (github + custom buymeacoffee), Buy Me a Coffee shield-badge anchored under H1 and as last line of README, `## 💖 Support` section before License, CI badge aligned to `?branch=main` form.
 
 ### 2026-05-11 — Project kickoff
 
@@ -55,7 +61,7 @@
 
 | Phase | Started | Completed | PR | Notes |
 |---|---|---|---|---|
-| 0 — Bootstrap | 2026-05-11 | 2026-05-11T09:15Z | n/a (direct on develop) | Coverage gate deferred to Phase 6; two smoke tests added to clear pytest exit-5 on empty scaffold. CI green at SHA `9e1f511`. |
+| 0 — Bootstrap | 2026-05-11 | 2026-05-11T09:48Z | [#1](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/1) | Coverage gate deferred to Phase 6; two smoke tests cleared pytest exit-5 on empty scaffold; funding/sponsor surface added per template §4.3. Merged develop→main via `--merge` strategy at main SHA `3abfb3d`. |
 | 1 — MVP Keyword | — | — | — | — |
 | 2 — Three Search Paths | — | — | — | — |
 | 3 — Pagination | — | — | — | — |

@@ -32,6 +32,9 @@ _USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/126.0.0.0 Safari/537.36"
 )
+_LOCALE = "en-US"
+_TIMEZONE = "America/New_York"
+_EXTRA_HEADERS = {"Accept-Language": "en-US,en;q=0.9"}
 _LIBRARY_ID_TEXT_RE = re.compile(r"Library ID:\s*\d+")
 _COOKIE_ACCEPT_RE = re.compile(r"Allow|Accept", re.IGNORECASE)
 _LOGIN_PROMPT_RE = re.compile(r"Log in", re.IGNORECASE)
@@ -53,6 +56,9 @@ class PlaywrightScraper(BaseScraper):
         self._context = await self._browser.new_context(
             viewport=_VIEWPORT,
             user_agent=_USER_AGENT,
+            locale=_LOCALE,
+            timezone_id=_TIMEZONE,
+            extra_http_headers=_EXTRA_HEADERS,
         )
         self._page = await self._context.new_page()
         await Stealth().apply_stealth_async(self._page)

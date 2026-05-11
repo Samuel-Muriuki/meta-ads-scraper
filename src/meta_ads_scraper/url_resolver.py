@@ -20,5 +20,6 @@ def _build_keyword_url(spec: SearchSpec) -> str:
         "country": spec.country,
         "q": spec.query,
         "search_type": "keyword_unordered",
+        "locale": "en_US",
     }
     return f"{_LIBRARY_BASE}?{urlencode(params)}"

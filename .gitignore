@@ -17,13 +17,16 @@ sdist/
 var/
 wheels/
 *.egg-info/
+pip-wheel-metadata/
 .installed.cfg
 *.egg
 MANIFEST
 
 # ─── Virtual environments ─────────────────────────────────────────
 .env
-.venv
+.env.local
+.env.*.local
+.venv/
 env/
 venv/
 ENV/
@@ -57,13 +60,24 @@ dmypy.json
 *.swp
 *.swo
 *~
+*.bak
+*.tmp
+*~.nib
+
+# ─── OS-specific ─────────────────────────────────────────────────
 .DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
 # ─── Playwright ───────────────────────────────────────────────────
 playwright/.cache/
 test-results/
 playwright-report/
 playwright/.auth/
+.playwright-browser-state/
+auth-state.json
 *.har
 !tests/fixtures/*.har
 
@@ -73,13 +87,14 @@ data/
 *.sqlite
 *.db
 *.db-journal
-auth-state.json
 
 # ─── Logs ─────────────────────────────────────────────────────────
 *.log
 logs/
 
 # ─── Secrets ──────────────────────────────────────────────────────
-.env.local
-.env.*.local
 secrets.json
+*.pem
+*.key
+*.crt
+credentials.json

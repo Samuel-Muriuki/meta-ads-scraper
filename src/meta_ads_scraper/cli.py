@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 import asyncio
-import json
+import sys
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, TextIO
 
 import typer
 
+from .exporters import write_ads_csv, write_ads_json
 from .models import Ad, SearchSpec
 from .scraper.playwright_scraper import PlaywrightScraper
+
+_Exporter = Callable[[Iterable[Ad], "Path | TextIO"], int]
+_EXPORTERS: dict[str, _Exporter] = {
+    "json": write_ads_json,
+    "csv": write_ads_csv,
+}
 
 app = typer.Typer(
     name="meta-ads-scraper",
@@ -31,22 +39,19 @@ def search(
     out: Annotated[Path | None, typer.Option("--out", help="output file (default: stdout)")] = None,
     max_results: Annotated[int, typer.Option("--max-results", help="cap on ads returned")] = 10,
 ) -> None:
-    if format_ == "csv":
-        raise NotImplementedError("--format csv is implemented in Phase 2")
-    if format_ != "json":
-        raise typer.BadParameter(f"unknown format: {format_!r}")
+    exporter = _EXPORTERS.get(format_)
+    if exporter is None:
+        raise typer.BadParameter(f"unknown format: {format_!r}; choose one of {sorted(_EXPORTERS)}")
 
     spec = _build_spec(keyword=keyword, page_url=page_url, page_slug=page_slug)
     ads = asyncio.run(_run_search(spec, max_results=max_results))
 
-    payload = [ad.model_dump(mode="json") for ad in ads]
-    text = json.dumps(payload, indent=2, default=str)
-
     if out is not None:
-        out.write_text(text, encoding="utf-8")
-        typer.echo(f"wrote {len(ads)} ad(s) to {out}", err=True)
+        count = exporter(ads, out)
+        typer.echo(f"wrote {count} ad(s) to {out}", err=True)
     else:
-        typer.echo(text)
+        exporter(ads, sys.stdout)
+        sys.stdout.write("\n")
 
 
 def _build_spec(*, keyword: str | None, page_url: str | None, page_slug: str | None) -> SearchSpec:

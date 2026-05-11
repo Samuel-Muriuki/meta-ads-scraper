@@ -1,16 +1,35 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from urllib.parse import parse_qs, urlparse
 
+import httpx
 import pytest
 
+from meta_ads_scraper import url_resolver
 from meta_ads_scraper.exceptions import PageResolutionError
 from meta_ads_scraper.models import SearchSpec
 from meta_ads_scraper.url_resolver import (
     _extract_slug,
+    _scrape_page_id,
     _slug_to_page_id,
     resolve_url,
 )
+
+
+def _patch_httpx(
+    monkeypatch: pytest.MonkeyPatch,
+    handler: Callable[[httpx.Request], httpx.Response],
+) -> None:
+    transport = httpx.MockTransport(handler)
+    real = url_resolver.httpx.AsyncClient
+
+    class _Patched(real):
+        def __init__(self, *args, **kwargs):
+            kwargs["transport"] = transport
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(url_resolver.httpx, "AsyncClient", _Patched)
 
 
 def _query_params(url: str) -> dict[str, list[str]]:
@@ -108,3 +127,80 @@ class TestSlugToPageId:
     async def test_reserved_slug_case_insensitive(self):
         with pytest.raises(PageResolutionError):
             await _slug_to_page_id("GROUPS")
+
+
+class TestScrapePageId:
+    async def test_extracts_from_al_android_meta_tag(self, monkeypatch):
+        html = '<html><meta property="al:android:url" content="fb://page/?id=98765"/></html>'
+        _patch_httpx(monkeypatch, lambda _req: httpx.Response(200, text=html))
+        assert await _scrape_page_id("Nike") == "98765"
+
+    async def test_extracts_from_page_id_json_string(self, monkeypatch):
+        html = 'window.SOMETHING = {"pageID":"12345","other":"x"};'
+        _patch_httpx(monkeypatch, lambda _req: httpx.Response(200, text=html))
+        assert await _scrape_page_id("Nike") == "12345"
+
+    async def test_extracts_from_page_id_json_number(self, monkeypatch):
+        html = '"page_id":555444333'
+        _patch_httpx(monkeypatch, lambda _req: httpx.Response(200, text=html))
+        assert await _scrape_page_id("Nike") == "555444333"
+
+    async def test_404_raises_page_resolution_error(self, monkeypatch):
+        _patch_httpx(monkeypatch, lambda _req: httpx.Response(404))
+        with pytest.raises(PageResolutionError, match="network"):
+            await _scrape_page_id("ThisPageDoesNotExist")
+
+    async def test_no_match_raises(self, monkeypatch):
+        _patch_httpx(monkeypatch, lambda _req: httpx.Response(200, text="<html>nothing</html>"))
+        with pytest.raises(PageResolutionError, match="could not extract"):
+            await _scrape_page_id("Nike")
+
+    async def test_request_targets_facebook_page_url(self, monkeypatch):
+        captured: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured.append(str(request.url))
+            return httpx.Response(200, text='"pageID":"1"')
+
+        _patch_httpx(monkeypatch, handler)
+        await _scrape_page_id("Nike")
+        assert captured[0].startswith("https://www.facebook.com/Nike")
+
+
+class TestResolveUrlPageModes:
+    async def test_page_slug_numeric_short_circuits(self, monkeypatch):
+        calls: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(str(request.url))
+            return httpx.Response(200, text="should not be called")
+
+        _patch_httpx(monkeypatch, handler)
+        spec = SearchSpec(mode="page_slug", query="555444333")
+        url = await resolve_url(spec)
+        assert calls == [], "numeric slugs must not trigger a network call"
+        assert "view_all_page_id=555444333" in url
+
+    async def test_page_slug_resolves_via_scrape(self, monkeypatch):
+        _patch_httpx(monkeypatch, lambda _req: httpx.Response(200, text='"pageID":"77"'))
+        spec = SearchSpec(mode="page_slug", query="Nike")
+        url = await resolve_url(spec)
+        assert "view_all_page_id=77" in url
+        assert "locale=en_US" in url
+
+    async def test_page_url_extracts_slug_then_resolves(self, monkeypatch):
+        _patch_httpx(monkeypatch, lambda _req: httpx.Response(200, text='"pageID":"88"'))
+        spec = SearchSpec(mode="page_url", query="https://www.facebook.com/Nike")
+        url = await resolve_url(spec)
+        assert "view_all_page_id=88" in url
+
+    async def test_page_url_profile_php_short_circuits(self, monkeypatch):
+        calls: list[str] = []
+        _patch_httpx(
+            monkeypatch,
+            lambda req: (calls.append(str(req.url)), httpx.Response(200, text=""))[1],
+        )
+        spec = SearchSpec(mode="page_url", query="https://www.facebook.com/profile.php?id=42")
+        url = await resolve_url(spec)
+        assert calls == [], "profile.php?id=N must not trigger a scrape"
+        assert "view_all_page_id=42" in url

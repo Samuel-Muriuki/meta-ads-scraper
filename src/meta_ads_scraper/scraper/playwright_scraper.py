@@ -116,8 +116,5 @@ class PlaywrightScraper(BaseScraper):
             return False
 
     async def _looks_blocked(self, page: Page) -> bool:
-        title = (await page.title()).lower()
-        if "log in" in title or "facebook" not in title:
-            return True
         login_button = page.get_by_role("button", name=_LOGIN_PROMPT_RE).first
         return await login_button.is_visible(timeout=1_000)

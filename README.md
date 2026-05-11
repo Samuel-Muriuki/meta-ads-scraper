@@ -1,5 +1,7 @@
 # Meta Ads Scraper
 
+<a href="https://www.buymeacoffee.com/elsamm"><img src="https://img.shields.io/badge/Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee" /></a>
+
 > A Python command-line scraper for Meta's Ad Library. Search by keyword, Facebook page URL, or page slug. Returns structured ad data as CSV or JSON.
 
 [![CI](https://github.com/Samuel-Muriuki/meta-ads-scraper/actions/workflows/ci.yml/badge.svg)](https://github.com/Samuel-Muriuki/meta-ads-scraper/actions/workflows/ci.yml)
@@ -117,6 +119,15 @@ Commits follow [gitmoji](https://gitmoji.dev/) conventions with mandatory scopes
 
 This is a job application deliverable, not an open-source project accepting contributions. Issues and pull requests will be closed.
 
+## 💖 Support
+
+If you find this project useful, please consider:
+
+- ⭐ Starring the repository
+- 🐛 Reporting bugs
+- 💡 Suggesting new features
+- ☕ [Buying me a coffee](https://www.buymeacoffee.com/elsamm)
+
 ## License
 
 MIT — see `LICENSE` (TBD).
@@ -126,3 +137,5 @@ MIT — see `LICENSE` (TBD).
 **Samuel Muriuki**
 Nairobi, Kenya
 [GitHub](https://github.com/Samuel-Muriuki) · [LinkedIn](https://www.linkedin.com/in/El-Samm) · [Portfolio](https://samuel-muriuki.vercel.app/)
+
+<a href="https://www.buymeacoffee.com/elsamm"><img src="https://img.shields.io/badge/Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee" /></a>

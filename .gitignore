@@ -81,6 +81,9 @@ auth-state.json
 *.har
 !tests/fixtures/*.har
 
+# Reconnaissance screenshots — reproducible from scripts/capture_html.py
+tests/fixtures/html/*.png
+
 # ─── Project runtime ──────────────────────────────────────────────
 data/
 !data/.gitkeep

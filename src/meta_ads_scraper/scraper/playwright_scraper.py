@@ -20,7 +20,8 @@ from playwright_stealth import Stealth
 
 from ..exceptions import PageResolutionError, ScraperBlockedError
 from ..models import Ad, SearchSpec
-from ..parsers.ad_card import iter_visible_ads
+from ..pagination import scroll_and_collect
+from ..parsers.ad_card import parse_ad_card
 from ..url_resolver import PAGE_ID_PATTERNS, resolve_url
 from .base import BaseScraper
 
@@ -43,13 +44,27 @@ _CARD_WAIT_TIMEOUT = 30_000
 _COOKIE_TIMEOUT = 3_000
 _LOGIN_PROBE_TIMEOUT = 1_000
 _PAGE_ID_NAV_TIMEOUT = 30_000
+_DEFAULT_SCRAPE_TIMEOUT_S = 300
+_AD_CARD_XPATH = (
+    "xpath=//div"
+    "[.//text()[contains(., 'Library ID:')] and .//img]"
+    "[not(.//div[.//text()[contains(., 'Library ID:')]])]"
+)
 
 
 class PlaywrightScraper(BaseScraper):
-    def __init__(self, *, headless: bool | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        headless: bool | None = None,
+        max_results: int | None = None,
+        timeout_seconds: int = _DEFAULT_SCRAPE_TIMEOUT_S,
+    ) -> None:
         if headless is None:
             headless = os.environ.get("PLAYWRIGHT_HEADLESS", "1") != "0"
         self._headless = headless
+        self._max_results = max_results
+        self._timeout_seconds = timeout_seconds
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
@@ -98,8 +113,15 @@ class PlaywrightScraper(BaseScraper):
             logger.warning("no_ads_visible", url=url)
             return
 
-        async for ad in iter_visible_ads(page, source_url=url):
-            yield ad
+        async for card in scroll_and_collect(
+            page,
+            _AD_CARD_XPATH,
+            max_results=self._max_results,
+            timeout_seconds=self._timeout_seconds,
+        ):
+            ad = await parse_ad_card(card, source_url=url)
+            if ad is not None:
+                yield ad
 
     async def _dismiss_cookie_consent(self, page: Page) -> None:
         try:

@@ -15,3 +15,7 @@ class ParseError(MetaAdsScraperError):
 
 class RateLimitedError(MetaAdsScraperError):
     pass
+
+
+class PageResolutionError(MetaAdsScraperError):
+    pass

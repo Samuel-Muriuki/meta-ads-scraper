@@ -277,7 +277,7 @@ Predicting the audit so we build to it:
 
 ## 13. Timeline & Phases
 
-See `BUILD-PLAN.md` for phase-by-phase Implementation prompts.
+See `BUILD-PLAN.md` for phase-by-phase implementation prompts.
 
 | Day | Hours | Phases |
 |---|---|---|

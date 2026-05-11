@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime
 
 import structlog
-from playwright.async_api import Locator
+from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import ValidationError
 
@@ -13,6 +14,7 @@ from ..models import Ad
 logger = structlog.get_logger()
 
 _LIBRARY_ID_RE = re.compile(r"Library ID:\s*(\d+)")
+_LIBRARY_ID_TEXT_RE = re.compile(r"Library ID:\s*\d+")
 _PROFILE_ID_RE = re.compile(r"profile\.php\?id=(\d+)")
 _PAGE_SLUG_RE = re.compile(r"facebook\.com/([^/?#]+)")
 _START_DATE_RE = re.compile(
@@ -36,6 +38,18 @@ _MONTHS = {
 }
 
 _KNOWN_PLATFORMS = ("Facebook", "Instagram", "Messenger", "Audience Network")
+
+
+async def iter_visible_ads(page: Page, source_url: str) -> AsyncIterator[Ad]:
+    library_ids = page.get_by_text(_LIBRARY_ID_TEXT_RE)
+    count = await library_ids.count()
+    logger.info("ads_visible", count=count)
+    for i in range(count):
+        id_text = library_ids.nth(i)
+        card = id_text.locator("xpath=ancestor::div[.//img][1]")
+        ad = await parse_ad_card(card, source_url=source_url)
+        if ad is not None:
+            yield ad
 
 
 async def parse_ad_card(card: Locator, source_url: str) -> Ad | None:

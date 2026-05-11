@@ -84,6 +84,11 @@ auth-state.json
 # Reconnaissance screenshots — reproducible from scripts/capture_html.py
 tests/fixtures/html/*.png
 
+# Raw FB page captures from scripts/capture_page.py — large, reproducible,
+# only used during selector reconnaissance. Slim fixtures (if any) are
+# committed under a different filename pattern.
+tests/fixtures/html/fb_page_*.html
+
 # ─── Project runtime ──────────────────────────────────────────────
 data/
 !data/.gitkeep

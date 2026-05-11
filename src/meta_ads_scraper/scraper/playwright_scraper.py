@@ -18,10 +18,10 @@ from playwright.async_api import (
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright_stealth import Stealth
 
-from ..exceptions import ScraperBlockedError
+from ..exceptions import PageResolutionError, ScraperBlockedError
 from ..models import Ad, SearchSpec
-from ..parsers.ad_card import parse_ad_card
-from ..url_resolver import resolve_url
+from ..parsers.ad_card import iter_visible_ads
+from ..url_resolver import PAGE_ID_PATTERNS, resolve_url
 from .base import BaseScraper
 
 logger = structlog.get_logger()
@@ -32,9 +32,17 @@ _USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/126.0.0.0 Safari/537.36"
 )
+_LOCALE = "en-US"
+_TIMEZONE = "America/New_York"
+_EXTRA_HEADERS = {"Accept-Language": "en-US,en;q=0.9"}
 _LIBRARY_ID_TEXT_RE = re.compile(r"Library ID:\s*\d+")
 _COOKIE_ACCEPT_RE = re.compile(r"Allow|Accept", re.IGNORECASE)
 _LOGIN_PROMPT_RE = re.compile(r"Log in", re.IGNORECASE)
+_DEFAULT_NAV_TIMEOUT = 60_000
+_CARD_WAIT_TIMEOUT = 30_000
+_COOKIE_TIMEOUT = 3_000
+_LOGIN_PROBE_TIMEOUT = 1_000
+_PAGE_ID_NAV_TIMEOUT = 30_000
 
 
 class PlaywrightScraper(BaseScraper):
@@ -53,6 +61,9 @@ class PlaywrightScraper(BaseScraper):
         self._context = await self._browser.new_context(
             viewport=_VIEWPORT,
             user_agent=_USER_AGENT,
+            locale=_LOCALE,
+            timezone_id=_TIMEZONE,
+            extra_http_headers=_EXTRA_HEADERS,
         )
         self._page = await self._context.new_page()
         await Stealth().apply_stealth_async(self._page)
@@ -75,10 +86,10 @@ class PlaywrightScraper(BaseScraper):
         if self._page is None:
             raise RuntimeError("PlaywrightScraper not entered — use `async with`")
         page = self._page
-        url = resolve_url(spec)
+        url = await resolve_url(spec, page_id_resolver=self._resolve_page_id)
         logger.info("scrape_start", url=url, mode=spec.mode, query=spec.query)
 
-        await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+        await page.goto(url, wait_until="domcontentloaded", timeout=_DEFAULT_NAV_TIMEOUT)
         await self._dismiss_cookie_consent(page)
 
         if not await self._wait_for_first_card(page):
@@ -87,21 +98,13 @@ class PlaywrightScraper(BaseScraper):
             logger.warning("no_ads_visible", url=url)
             return
 
-        library_ids = page.get_by_text(_LIBRARY_ID_TEXT_RE)
-        count = await library_ids.count()
-        logger.info("ads_visible_first_page", count=count)
-
-        for i in range(count):
-            id_text = library_ids.nth(i)
-            card = id_text.locator("xpath=ancestor::div[.//img][1]")
-            ad = await parse_ad_card(card, source_url=url)
-            if ad is not None:
-                yield ad
+        async for ad in iter_visible_ads(page, source_url=url):
+            yield ad
 
     async def _dismiss_cookie_consent(self, page: Page) -> None:
         try:
             btn = page.get_by_role("button", name=_COOKIE_ACCEPT_RE).first
-            await btn.click(timeout=3_000)
+            await btn.click(timeout=_COOKIE_TIMEOUT)
             logger.info("cookie_consent_dismissed")
         except PlaywrightTimeoutError:
             logger.debug("no_cookie_consent_dialog")
@@ -109,7 +112,7 @@ class PlaywrightScraper(BaseScraper):
     async def _wait_for_first_card(self, page: Page) -> bool:
         try:
             await page.get_by_text(_LIBRARY_ID_TEXT_RE).first.wait_for(
-                state="visible", timeout=30_000
+                state="visible", timeout=_CARD_WAIT_TIMEOUT
             )
             return True
         except PlaywrightTimeoutError:
@@ -117,4 +120,23 @@ class PlaywrightScraper(BaseScraper):
 
     async def _looks_blocked(self, page: Page) -> bool:
         login_button = page.get_by_role("button", name=_LOGIN_PROMPT_RE).first
-        return await login_button.is_visible(timeout=1_000)
+        return await login_button.is_visible(timeout=_LOGIN_PROBE_TIMEOUT)
+
+    async def _resolve_page_id(self, slug: str) -> str:
+        if self._page is None:
+            raise RuntimeError("PlaywrightScraper not entered — use `async with`")
+        page = self._page
+        fb_url = f"https://www.facebook.com/{slug}"
+        logger.info("page_id_resolve_start", slug=slug, url=fb_url)
+        await page.goto(fb_url, wait_until="domcontentloaded", timeout=_PAGE_ID_NAV_TIMEOUT)
+        await self._dismiss_cookie_consent(page)
+        html = await page.content()
+        for pattern in PAGE_ID_PATTERNS:
+            if (m := pattern.search(html)) is not None:
+                page_id = m.group(1)
+                logger.info("page_id_resolved", slug=slug, page_id=page_id)
+                return page_id
+        raise PageResolutionError(
+            f"could not extract page_id from {fb_url}; "
+            f"page may require login or use unrecognized markup"
+        )

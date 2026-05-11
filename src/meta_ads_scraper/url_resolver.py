@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Awaitable, Callable
 from urllib.parse import parse_qs, urlencode, urlparse
-
-import httpx
-import structlog
 
 from .exceptions import PageResolutionError
 from .models import SearchSpec
-
-logger = structlog.get_logger()
 
 _LIBRARY_BASE = "https://www.facebook.com/ads/library/"
 _FACEBOOK_HOSTS = frozenset({"www.facebook.com", "m.facebook.com", "facebook.com"})
@@ -32,27 +28,33 @@ _RESERVED_SLUGS = frozenset(
         "recover",
     }
 )
-_DESKTOP_UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/126.0.0.0 Safari/537.36"
-)
-_PAGE_ID_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r'content="fb://page/?\?id=(\d+)"'),
+PAGE_ID_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r'"delegate_page":\{"id":"(\d+)"'),
+    re.compile(r'"associated_page_id":"(\d+)"'),
+    re.compile(r'\\"page_id\\":\\"(\d+)\\"'),
+    re.compile(r'"page_id":"(\d+)"'),
     re.compile(r'"pageID":"(\d+)"'),
-    re.compile(r'"page_id":(\d+)'),
+    re.compile(r'content="fb://page/?\?id=(\d+)"'),
     re.compile(r'al:android:url" content="fb://page/(\d+)"'),
 )
 
+PageIdResolver = Callable[[str], Awaitable[str]]
 
-async def resolve_url(spec: SearchSpec) -> str:
+
+async def resolve_url(spec: SearchSpec, *, page_id_resolver: PageIdResolver | None = None) -> str:
     if spec.mode == "keyword":
         return _build_keyword_url(spec)
-    if spec.mode == "page_slug":
-        page_id = await _slug_to_page_id(spec.query)
-    else:  # page_url
-        slug = _extract_slug(spec.query)
-        page_id = await _slug_to_page_id(slug)
+    slug = spec.query if spec.mode == "page_slug" else _extract_slug(spec.query)
+    if slug.isdigit():
+        page_id = slug
+    elif slug.lower() in _RESERVED_SLUGS:
+        raise PageResolutionError(f"reserved Facebook path segment, not a page slug: {slug!r}")
+    else:
+        if page_id_resolver is None:
+            raise PageResolutionError(
+                f"resolving slug {slug!r} requires a page_id_resolver callable"
+            )
+        page_id = await page_id_resolver(slug)
     return _build_page_library_url(page_id, spec)
 
 
@@ -93,34 +95,3 @@ def _extract_slug(url: str) -> str:
     if not parts or not parts[0]:
         raise PageResolutionError(f"no slug segment in URL: {url!r}")
     return parts[0]
-
-
-async def _slug_to_page_id(slug: str) -> str:
-    if slug.isdigit():
-        return slug
-    if slug.lower() in _RESERVED_SLUGS:
-        raise PageResolutionError(f"reserved Facebook path segment, not a page slug: {slug!r}")
-    return await _scrape_page_id(slug)
-
-
-async def _scrape_page_id(slug: str) -> str:
-    headers = {"User-Agent": _DESKTOP_UA, "Accept-Language": "en-US,en;q=0.9"}
-    url = f"https://www.facebook.com/{slug}"
-    logger.info("page_id_scrape_start", slug=slug, url=url)
-    try:
-        async with httpx.AsyncClient(
-            headers=headers, follow_redirects=True, timeout=30.0
-        ) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            html = resp.text
-    except httpx.HTTPError as e:
-        raise PageResolutionError(f"network failure resolving slug {slug!r}: {e}") from e
-    for pattern in _PAGE_ID_PATTERNS:
-        if (m := pattern.search(html)) is not None:
-            page_id = m.group(1)
-            logger.info("page_id_resolved", slug=slug, page_id=page_id)
-            return page_id
-    raise PageResolutionError(
-        f"could not extract page_id from {url}; page may require login or use unrecognized markup"
-    )

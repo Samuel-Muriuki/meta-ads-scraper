@@ -18,10 +18,10 @@ from playwright.async_api import (
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright_stealth import Stealth
 
-from ..exceptions import ScraperBlockedError
+from ..exceptions import PageResolutionError, ScraperBlockedError
 from ..models import Ad, SearchSpec
 from ..parsers.ad_card import iter_visible_ads
-from ..url_resolver import resolve_url
+from ..url_resolver import PAGE_ID_PATTERNS, resolve_url
 from .base import BaseScraper
 
 logger = structlog.get_logger()
@@ -42,6 +42,7 @@ _DEFAULT_NAV_TIMEOUT = 60_000
 _CARD_WAIT_TIMEOUT = 30_000
 _COOKIE_TIMEOUT = 3_000
 _LOGIN_PROBE_TIMEOUT = 1_000
+_PAGE_ID_NAV_TIMEOUT = 30_000
 
 
 class PlaywrightScraper(BaseScraper):
@@ -85,7 +86,7 @@ class PlaywrightScraper(BaseScraper):
         if self._page is None:
             raise RuntimeError("PlaywrightScraper not entered — use `async with`")
         page = self._page
-        url = await resolve_url(spec)
+        url = await resolve_url(spec, page_id_resolver=self._resolve_page_id)
         logger.info("scrape_start", url=url, mode=spec.mode, query=spec.query)
 
         await page.goto(url, wait_until="domcontentloaded", timeout=_DEFAULT_NAV_TIMEOUT)
@@ -120,3 +121,22 @@ class PlaywrightScraper(BaseScraper):
     async def _looks_blocked(self, page: Page) -> bool:
         login_button = page.get_by_role("button", name=_LOGIN_PROMPT_RE).first
         return await login_button.is_visible(timeout=_LOGIN_PROBE_TIMEOUT)
+
+    async def _resolve_page_id(self, slug: str) -> str:
+        if self._page is None:
+            raise RuntimeError("PlaywrightScraper not entered — use `async with`")
+        page = self._page
+        fb_url = f"https://www.facebook.com/{slug}"
+        logger.info("page_id_resolve_start", slug=slug, url=fb_url)
+        await page.goto(fb_url, wait_until="domcontentloaded", timeout=_PAGE_ID_NAV_TIMEOUT)
+        await self._dismiss_cookie_consent(page)
+        html = await page.content()
+        for pattern in PAGE_ID_PATTERNS:
+            if (m := pattern.search(html)) is not None:
+                page_id = m.group(1)
+                logger.info("page_id_resolved", slug=slug, page_id=page_id)
+                return page_id
+        raise PageResolutionError(
+            f"could not extract page_id from {fb_url}; "
+            f"page may require login or use unrecognized markup"
+        )

@@ -52,6 +52,18 @@
 
 ## Followups Logged Not Filed
 
+### Phase 2 Pre-Conditions — must land before any Phase 2 feature work
+
+These three items are blockers, not nice-to-haves. Phase 2 starts with these, in this order, before `page_url` / `page_slug` resolution or the CSV exporter.
+
+1. **Force English locale on every Meta request.** Append `&locale=en_US` to the URL produced by `resolve_url()` AND set `Accept-Language: en-US,en;q=0.9` on the `BrowserContext` extra HTTP headers. Highest-priority Phase 2 blocker — without this the parser collapses outside English-default geos (Kenya gets Swahili UI, the `getByText("Library ID:")` anchor never matches, `python -m meta_ads_scraper search` returns `[]`). Verified during Phase 1 live smoke; the HTML fixture at `tests/fixtures/html/keyword_search_shoes.html` (page title `Maktaba ya Matangazo`) is the diagnostic.
+
+2. **Add an offline parser integration test against the committed HTML fixture.** Load `tests/fixtures/html/keyword_search_shoes.html` via `page.set_content(html)` (or a HAR `route_from_har`), drive the existing `PlaywrightScraper.search` loop against it, and assert **≥ 5** `Ad` instances parse cleanly — each with non-empty `ad_library_id` AND non-empty `page_id`. Phase 1 shipped green-CI but with **zero proof the parser actually works against real DOM**. Phase 2 closes that gap before adding modes or exporters. New file: `tests/integration/test_parser_replay.py`. This becomes the regression backstop for every selector change from here on.
+
+3. **Slim the HTML fixture to ~50 KB.** The current fixture is **1.89 MB** — most of that is Meta's runtime JS bundles, not ad markup. Reduce to one `<html><body>` wrapper + 5–10 ad cards + minimal `<head>` (no inline scripts). Smaller fixtures: diff cleanly in PRs, load fast in tests, and keep the repo lean if Phase 2+ adds more fixtures. Add a `scripts/slim_fixture.py` (or inline `bs4` step) that takes the raw capture and emits the slimmed version. Keep `scripts/capture_html.py` for re-capture; the slim version is the committed test artifact.
+
+### Other followups
+
 - After MVP works, add a stealth-mode toggle (--stealth on/off) for debugging
 - Consider exposing Path A as a fallback for political ads in Phase 8+
 - Add `--screenshot-on-error` flag to dump page state when scraping fails
@@ -61,8 +73,6 @@
 - **Tooling tidy:** ruff warns `ANN101` / `ANN102` are deprecated rules. The `pyproject.toml` mypy override for `tenacity.*` is currently unused (Phase 4 retry policies will make it live).
 - **`docs/contracts/ad-data-schema.md` claim about hashability is wrong.** `frozen=True` only auto-hashes when every field is hashable, and `Ad` has list fields. Fix the contract doc when revisiting it at Phase 6 (tests & coverage tightening).
 - **`.project/patterns/pytest-patterns/README.md` line 191** still says `pyproject.toml enforces --cov-fail-under=60`. Phase 0 deferred that to Phase 6 — sweep this and any other stale claims when Phase 6 re-adds the gate.
-- **Phase 2 — locale forcing.** First bug Phase 2 must fix: append `&locale=en_US` to the URL (or set `Accept-Language: en-US,en;q=0.9` on the BrowserContext) so the parser's English text anchors actually match. Without this, scraping from any non-English locale returns 0 ads.
-- **Phase 2 — re-tune selectors using the HTML fixture.** `tests/fixtures/html/keyword_search_shoes.html` is the deterministic test bed. Open it in a browser or `bs4`/`lxml` and find the card-level wrapper, the ad-ID anchor, the page-name link, and the creative image — then encode those as `data-*` attribute selectors if Meta provides them, or as locale-agnostic structural traversals otherwise.
 
 ---
 

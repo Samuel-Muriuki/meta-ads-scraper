@@ -6,18 +6,27 @@
 
 ## Current Phase
 
-**Phase 1 — MVP Keyword Search** (in review)
+**Phase 2 — Three Search Paths + Exporters** (in review)
 
-**Feature branch:** `feat/phase-1-mvp-keyword` — open PR [#2](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/2)
-**Develop tip:** `d9e1622` — `🔨 chore(memory): record Phase 0 PR #1 merge`
+**Feature branch:** `feat/phase-2-three-paths` — open PR [#3](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/3)
+**Develop tip:** `307a3d8` — `Merge pull request #2 from Samuel-Muriuki/feat/phase-1-mvp-keyword` (Phase 1 boundary)
 **Main tip:** `3abfb3d` — `Merge pull request #1 from Samuel-Muriuki/develop` (Phase 0 boundary)
-**Last commit on feat branch:** `6cde660` — `🧪 test: smoke integration test for live Playwright (gated)`
-**CI status (PR #2):** ✅ green — https://github.com/Samuel-Muriuki/meta-ads-scraper/actions/runs/25666937201
-**Open PRs:** [#2 — Phase 1: MVP keyword search](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/2)
+**Last commit on feat branch:** `f5d1afb` — `🐛 fix(tests): strip ANSI escapes in CLI tests; reformat scripts`
+**CI status (PR #3):** ✅ green — https://github.com/Samuel-Muriuki/meta-ads-scraper/actions/runs/25678576378
+**Open PRs:** [#3 — Phase 2: Three search paths + exporters](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/3)
+**Selected path:** **Path C — full BUILD-PLAN through Phase 7** (Samuel: "Path C")
 
 ---
 
 ## Recent Decisions
+
+### 2026-05-11 — Phase 2 in review
+
+- **Three search modes all live end-to-end.** `keyword=shoes`, `page_slug=Nike`, `page_url=https://www.facebook.com/Nike` each return ≥ 5 valid `Ad` records against real Meta. 3 parametrized live tests pass in 273s combined (gated by `META_LIVE_TESTS=1`).
+- **Page-id resolution mechanism switched mid-phase.** Initial httpx-based scrape (commit `61834ff`) returned 400 Bad Request from live Meta despite passing all unit tests with `httpx.MockTransport`. Refactored to use the existing Playwright BrowserContext (commit `7c174ad`) — same stealth chromium fingerprint that works for the keyword scrape, so Meta serves the real page. httpx import removed from `url_resolver` entirely; `resolve_url` now takes an injectable `page_id_resolver` callable. **Lesson:** unit tests against mock transport were technically passing while production was completely broken. Don't trust mock-transport coverage for anti-bot-prone endpoints — verify against live.
+- **Updated PAGE_ID_PATTERNS for current Meta DOM.** Verified against a live Nike page capture: `"delegate_page":{"id":"N"}` is the canonical pattern now; `"associated_page_id":"N"` and escaped-JSON `\"page_id\":\"N\"` are secondary. Legacy `"pageID":"N"` and `fb://page/?id=N` patterns kept as a safety net.
+- **Three Pre-Conditions all delivered before feature work.** Locale forcing makes the page render in English (was Swahili from Kenya GeoIP). Fixture slimmed 1.89 MB → 30 KB. Offline parser integration test asserts ≥ 5 cards parse cleanly from `keyword_search_shoes.html` — runs on every push in CI, closes Phase 1's "ships green but unverified against real DOM" gap.
+- **CI ANSI gotcha.** Typer/Click + Rich emit ANSI escape codes on Linux CI runners but not in local Windows PowerShell. Substring assertions against `result.output` need to strip `\x1b\[...m` first; fixed via a `_plain()` helper in `test_cli.py`.
 
 ### 2026-05-11 — Phase 1 in review
 
@@ -52,15 +61,12 @@
 
 ## Followups Logged Not Filed
 
-### Phase 2 Pre-Conditions — must land before any Phase 2 feature work
+### Phase 2 Pre-Conditions — DELIVERED in PR #3
 
-These three items are blockers, not nice-to-haves. Phase 2 starts with these, in this order, before `page_url` / `page_slug` resolution or the CSV exporter.
-
-1. **Force English locale on every Meta request.** Append `&locale=en_US` to the URL produced by `resolve_url()` AND set `Accept-Language: en-US,en;q=0.9` on the `BrowserContext` extra HTTP headers. Highest-priority Phase 2 blocker — without this the parser collapses outside English-default geos (Kenya gets Swahili UI, the `getByText("Library ID:")` anchor never matches, `python -m meta_ads_scraper search` returns `[]`). Verified during Phase 1 live smoke; the HTML fixture at `tests/fixtures/html/keyword_search_shoes.html` (page title `Maktaba ya Matangazo`) is the diagnostic.
-
-2. **Add an offline parser integration test against the committed HTML fixture.** Load `tests/fixtures/html/keyword_search_shoes.html` via `page.set_content(html)` (or a HAR `route_from_har`), drive the existing `PlaywrightScraper.search` loop against it, and assert **≥ 5** `Ad` instances parse cleanly — each with non-empty `ad_library_id` AND non-empty `page_id`. Phase 1 shipped green-CI but with **zero proof the parser actually works against real DOM**. Phase 2 closes that gap before adding modes or exporters. New file: `tests/integration/test_parser_replay.py`. This becomes the regression backstop for every selector change from here on.
-
-3. **Slim the HTML fixture to ~50 KB.** The current fixture is **1.89 MB** — most of that is Meta's runtime JS bundles, not ad markup. Reduce to one `<html><body>` wrapper + 5–10 ad cards + minimal `<head>` (no inline scripts). Smaller fixtures: diff cleanly in PRs, load fast in tests, and keep the repo lean if Phase 2+ adds more fixtures. Add a `scripts/slim_fixture.py` (or inline `bs4` step) that takes the raw capture and emits the slimmed version. Keep `scripts/capture_html.py` for re-capture; the slim version is the committed test artifact.
+All three pre-conditions shipped:
+1. ✅ Locale forcing: `a91bf73` — BrowserContext.locale="en-US" + Accept-Language header + timezone + `&locale=en_US` URL param. Page renders in English; live keyword smoke 0 → ≥ 5 ads.
+2. ✅ Slim fixture: `5881980` — 1.89 MB → 30 KB. `scripts/slim_fixture.py` reproducer committed.
+3. ✅ Offline parser test: `954c6df` — `tests/integration/test_parser_offline.py` asserts ≥ 5 ads parse cleanly from the slim fixture. Runs on every CI push.
 
 ### Other followups
 
@@ -81,8 +87,8 @@ These three items are blockers, not nice-to-haves. Phase 2 starts with these, in
 | Phase | Started | Completed | PR | Notes |
 |---|---|---|---|---|
 | 0 — Bootstrap | 2026-05-11 | 2026-05-11T09:48Z | [#1](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/1) | Coverage gate deferred to Phase 6; two smoke tests cleared pytest exit-5 on empty scaffold; funding/sponsor surface added per template §4.3. Merged develop→main via `--merge` strategy at main SHA `3abfb3d`. |
-| 1 — MVP Keyword | 2026-05-11 | (in review) | [#2](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/2) | 8 atomic commits on `feat/phase-1-mvp-keyword`. Live smoke against real Meta returned 0 ads — page rendered in Swahili (geo-locale to Kenya), English `"Library ID:"` text anchor never matched. HTML fixture captured to `tests/fixtures/html/keyword_search_shoes.html` for Phase 2 selector reconnaissance. PR CI green. |
-| 2 — Three Search Paths | — | — | — | — |
+| 1 — MVP Keyword | 2026-05-11 | 2026-05-11T11:53Z | [#2](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/2) | 11 atomic commits. Live keyword smoke 0 ads (Swahili locale). HTML fixture captured for Phase 2 reconnaissance. Merged to develop. |
+| 2 — Three Search Paths | 2026-05-11 | (in review) | [#3](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/3) | 10 atomic commits. All 3 pre-conditions + 5 feature + 1 mid-phase refactor (httpx → Playwright nav) + 1 CI fix. All 3 live modes pass end-to-end. PR CI green. |
 | 3 — Pagination | — | — | — | — |
 | 4 — Resilience | — | — | — | — |
 | 5 — CLI Polish & Resume | — | — | — | — |
@@ -93,8 +99,8 @@ These three items are blockers, not nice-to-haves. Phase 2 starts with these, in
 
 ## Active Worktree State
 
-- Branch: `feat/phase-1-mvp-keyword`
-- Uncommitted edits: (none — about to commit this MEMORY update + HTML fixture + capture script)
+- Branch: `feat/phase-2-three-paths`
+- Uncommitted edits: (none — about to commit this MEMORY update)
 - Stash: (none)
 
 ---

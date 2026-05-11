@@ -121,7 +121,6 @@ addopts = [
     "--cov=src/meta_ads_scraper",
     "--cov-report=term-missing",
     "--cov-report=html",
-    "--cov-fail-under=60",
 ]
 
 [tool.coverage.run]

@@ -109,9 +109,7 @@ class TestResolveUrlPageModes:
 
     async def test_page_url_profile_php_short_circuits(self):
         calls: list[str] = []
-        spec = SearchSpec(
-            mode="page_url", query="https://www.facebook.com/profile.php?id=42"
-        )
+        spec = SearchSpec(mode="page_url", query="https://www.facebook.com/profile.php?id=42")
         url = await resolve_url(spec, page_id_resolver=_make_resolver(calls=calls))
         assert calls == []
         assert "view_all_page_id=42" in url
@@ -119,32 +117,24 @@ class TestResolveUrlPageModes:
     async def test_page_slug_invokes_resolver(self):
         calls: list[str] = []
         spec = SearchSpec(mode="page_slug", query="Nike")
-        url = await resolve_url(
-            spec, page_id_resolver=_make_resolver(returns="77", calls=calls)
-        )
+        url = await resolve_url(spec, page_id_resolver=_make_resolver(returns="77", calls=calls))
         assert calls == ["Nike"]
         assert "view_all_page_id=77" in url
 
     async def test_page_url_extracts_then_invokes_resolver(self):
         calls: list[str] = []
         spec = SearchSpec(mode="page_url", query="https://www.facebook.com/Nike")
-        url = await resolve_url(
-            spec, page_id_resolver=_make_resolver(returns="88", calls=calls)
-        )
+        url = await resolve_url(spec, page_id_resolver=_make_resolver(returns="88", calls=calls))
         assert calls == ["Nike"]
         assert "view_all_page_id=88" in url
 
     async def test_page_url_mobile_host_extracts_slug(self):
         calls: list[str] = []
         spec = SearchSpec(mode="page_url", query="https://m.facebook.com/Nike")
-        await resolve_url(
-            spec, page_id_resolver=_make_resolver(returns="99", calls=calls)
-        )
+        await resolve_url(spec, page_id_resolver=_make_resolver(returns="99", calls=calls))
         assert calls == ["Nike"]
 
-    @pytest.mark.parametrize(
-        "reserved", ["groups", "marketplace", "watch", "events", "pages"]
-    )
+    @pytest.mark.parametrize("reserved", ["groups", "marketplace", "watch", "events", "pages"])
     async def test_reserved_slug_rejected_before_resolver(self, reserved: str):
         calls: list[str] = []
         spec = SearchSpec(mode="page_slug", query=reserved)
@@ -164,9 +154,7 @@ class TestResolveUrlPageModes:
 
     async def test_resolver_value_used_in_url(self):
         spec = SearchSpec(mode="page_slug", query="Coca-Cola", country="US")
-        url = await resolve_url(
-            spec, page_id_resolver=_make_resolver(returns="987654321")
-        )
+        url = await resolve_url(spec, page_id_resolver=_make_resolver(returns="987654321"))
         params = _query_params(url)
         assert params["view_all_page_id"] == ["987654321"]
         assert params["country"] == ["US"]

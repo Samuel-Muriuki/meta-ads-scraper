@@ -48,8 +48,8 @@ async def main(slug: str) -> None:
         r'"page_id"[^,}]{0,40}',
         r'al:android[^"]{0,60}',
         r'fb://page[^"]{0,40}',
-        r'page_id=\d+',
-        r'pageID&quot;:[^,]{0,40}',
+        r"page_id=\d+",
+        r"pageID&quot;:[^,]{0,40}",
         r'"entity_id"[^,]{0,40}',
     ):
         matches = re.findall(pattern, html)[:3]

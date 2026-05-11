@@ -41,9 +41,7 @@ async def main() -> None:
         html = await page.content()
         title = await page.title()
         (OUT_DIR / "keyword_search_shoes.html").write_text(html, encoding="utf-8")
-        await page.screenshot(
-            path=str(OUT_DIR / "keyword_search_shoes.png"), full_page=True
-        )
+        await page.screenshot(path=str(OUT_DIR / "keyword_search_shoes.png"), full_page=True)
         await ctx.close()
         await browser.close()
         print(f"title={title!r}")

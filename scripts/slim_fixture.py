@@ -66,16 +66,14 @@ async def main() -> None:
         await browser.close()
 
     slim = (
-        '<!DOCTYPE html>\n'
+        "<!DOCTYPE html>\n"
         '<html lang="en">\n'
-        '<head>\n'
+        "<head>\n"
         '<meta charset="utf-8">\n'
-        '<title>Ad Library</title>\n'
-        '</head>\n'
-        '<body>\n'
-        '<main role="main">\n'
-        + "\n".join(card_htmls)
-        + "\n</main>\n"
+        "<title>Ad Library</title>\n"
+        "</head>\n"
+        "<body>\n"
+        '<main role="main">\n' + "\n".join(card_htmls) + "\n</main>\n"
         "</body>\n"
         "</html>\n"
     )

@@ -9,8 +9,13 @@ from typing import Annotated, TextIO
 import typer
 
 from .exporters import write_ads_csv, write_ads_json
+from .logging_config import configure_logging
 from .models import Ad, SearchSpec
+from .rate_limit import MAX_CONCURRENCY_CEILING
 from .scraper.playwright_scraper import PlaywrightScraper
+
+_MIN_RATE_LIMIT = 0.1
+_MAX_RATE_LIMIT = 10.0
 
 _Exporter = Callable[[Iterable[Ad], "Path | TextIO"], int]
 _EXPORTERS: dict[str, _Exporter] = {
@@ -76,12 +81,51 @@ def search(
             help="Wall-clock budget for the scrape, in seconds.",
         ),
     ] = 300,
+    rate_limit: Annotated[
+        float,
+        typer.Option(
+            "--rate-limit",
+            help=(
+                "Requests per second to upstream. Clamped to "
+                f"[{_MIN_RATE_LIMIT}, {_MAX_RATE_LIMIT}]."
+            ),
+        ),
+    ] = 1.0,
+    concurrency: Annotated[
+        int,
+        typer.Option(
+            "--concurrency",
+            help=(
+                "Max in-flight scroll iterations. Hard-clamped to "
+                f"{MAX_CONCURRENCY_CEILING}; higher values log a warning."
+            ),
+        ),
+    ] = 1,
+    verbose: Annotated[
+        int,
+        typer.Option(
+            "--verbose",
+            "-v",
+            count=True,
+            help="Increase log verbosity. -v = INFO, -vv = DEBUG (pretty console).",
+        ),
+    ] = 0,
 ) -> None:
+    configure_logging(verbosity=verbose)
     _validate_inputs(keyword=keyword, page_url=page_url, page_slug=page_slug)
+    rate_limit = _clamp_rate_limit(rate_limit)
     exporter = _select_exporter(format_)
 
     spec = _build_spec(keyword=keyword, page_url=page_url, page_slug=page_slug)
-    ads = asyncio.run(_run_search(spec, max_results=max_results, timeout_seconds=timeout_seconds))
+    ads = asyncio.run(
+        _run_search(
+            spec,
+            max_results=max_results,
+            timeout_seconds=timeout_seconds,
+            rate_limit=rate_limit,
+            concurrency=concurrency,
+        )
+    )
 
     if out is not None:
         count = exporter(ads, out)
@@ -118,6 +162,14 @@ def _select_exporter(format_: str) -> _Exporter:
     return exporter
 
 
+def _clamp_rate_limit(rate_limit: float) -> float:
+    if rate_limit < _MIN_RATE_LIMIT:
+        raise typer.BadParameter(f"--rate-limit must be >= {_MIN_RATE_LIMIT}, got {rate_limit}")
+    if rate_limit > _MAX_RATE_LIMIT:
+        raise typer.BadParameter(f"--rate-limit must be <= {_MAX_RATE_LIMIT}, got {rate_limit}")
+    return rate_limit
+
+
 def _build_spec(*, keyword: str | None, page_url: str | None, page_slug: str | None) -> SearchSpec:
     if keyword is not None:
         return SearchSpec(mode="keyword", query=keyword)
@@ -128,11 +180,19 @@ def _build_spec(*, keyword: str | None, page_url: str | None, page_slug: str | N
 
 
 async def _run_search(
-    spec: SearchSpec, *, max_results: int | None, timeout_seconds: int
+    spec: SearchSpec,
+    *,
+    max_results: int | None,
+    timeout_seconds: int,
+    rate_limit: float,
+    concurrency: int,
 ) -> list[Ad]:
     ads: list[Ad] = []
     async with PlaywrightScraper(
-        max_results=max_results, timeout_seconds=timeout_seconds
+        max_results=max_results,
+        timeout_seconds=timeout_seconds,
+        rate_limit=rate_limit,
+        concurrency=concurrency,
     ) as scraper:
         async for ad in scraper.search(spec):
             ads.append(ad)

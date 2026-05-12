@@ -9,6 +9,8 @@ import structlog
 from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+from .retry import retry_dom
+
 logger = structlog.get_logger()
 
 MAX_RESULTS_CEILING = 1000
@@ -75,8 +77,11 @@ async def scroll_and_collect(
 
             await _scroll_to_bottom(page)
             try:
-                await page.wait_for_load_state("networkidle", timeout=_SCROLL_WAIT_TIMEOUT_MS)
+                await _wait_for_networkidle(page, _SCROLL_WAIT_TIMEOUT_MS)
             except PlaywrightTimeoutError:
+                # Networkidle never arrived even after the retry; that's a
+                # signal the page is still streaming chatter, not a fatal
+                # error. Continue the scroll loop.
                 pass
     except asyncio.CancelledError:
         logger.info("shutdown_requested", yielded=len(yielded))
@@ -99,7 +104,16 @@ def _normalize_max_results(max_results: int | None) -> int | None:
     return max_results
 
 
+@retry_dom
 async def _scroll_to_bottom(page: Page) -> None:
+    """Scroll the results container (or window) to the bottom.
+
+    Wrapped in ``@retry_dom`` so a transient ``PlaywrightTimeoutError``
+    on the locator count / evaluate step gets one retry with a 2s wait
+    before propagating. Non-timeout Playwright errors propagate
+    immediately — they indicate a deeper problem (frame detached, page
+    closed) that scroll-loop retry cannot fix.
+    """
     container_count = await page.locator(_CONTAINER_SELECTOR).count()
     if container_count > 0:
         await page.locator(_CONTAINER_SELECTOR).first.evaluate(
@@ -107,6 +121,18 @@ async def _scroll_to_bottom(page: Page) -> None:
         )
     else:
         await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+
+
+@retry_dom
+async def _wait_for_networkidle(page: Page, timeout_ms: int) -> None:
+    """Wait for the network to go idle after a scroll.
+
+    Wrapped in ``@retry_dom`` so a stalled ``networkidle`` (which surfaces
+    as ``PlaywrightTimeoutError``) gets a single 2s-spaced retry before
+    propagating. The caller swallows the final exception — networkidle
+    failing twice in a row is informational, not fatal.
+    """
+    await page.wait_for_load_state("networkidle", timeout=timeout_ms)
 
 
 async def _extract_card_id(card: Locator) -> str | None:

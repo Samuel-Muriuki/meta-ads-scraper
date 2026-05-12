@@ -6,17 +6,25 @@
 
 ## Current Phase
 
-**Phase 3 — Pagination** (in review)
+**Phase 4 — Resilience** (not yet started)
 
-**Feature branch:** `feat/phase-3-pagination` (PR opening on push)
-**Develop tip:** `7f14020` — `Merge pull request #1 from Samuel-Muriuki/feat/phase-2-three-paths` (Phase 2 boundary)
+**Phase 3 merge commit:** `d7b28b9` — `Merge pull request #2 from Samuel-Muriuki/feat/phase-3-pagination`
 **Main tip:** `9598b78` — Phase 0 closeout
-**Last commit on feat branch:** `20efa85` — `🧪 test: extend smoke test to verify pagination yields multi-page results`
 **Build path:** full BUILD-PLAN through Phase 7 (no scope cuts)
+**Submission deadline:** Monday 2026-05-13 9 PM Nairobi
 
 ---
 
 ## Recent Decisions
+
+### 2026-05-12 — Phase 3 closeout
+
+- **Pure xpath card-boundary expressions FAIL on Meta's nested React DOM.** Initial selector returned 0 ads live. The working pattern is Playwright's **chained `text=/Library ID:\s*\d+/ >> xpath=ancestor::div[.//img][1]`** — anchor on the Library ID text node, walk up to the closest div containing an img. Same approach used by `iter_visible_ads` and validated by the offline parser test.
+- **Manual E2E confirmed.** `python -m meta_ads_scraper search --keyword shoes --max-results 10 --format json` returned 10 ads cleanly in ~41s. Real verticals observed: Nike, Amazon India, Level Shoes, FirstCry, schuh, Temu, animal-rights ads, music artist promos. Proves the scraper handles realistic Hoski-relevant traffic mix.
+- **Locale fix (Phase 2) still working.** Resolved URL includes `&locale=en_US`, output is English, "Library ID:" anchor matches. The Swahili-collapse failure mode from Phase 1 is fully eliminated.
+- **Pagination ceiling untested at 1000 ads.** Phase 4 RateLimiter must come before any sustained-load test against the ceiling — currently we'd risk Meta rate-limiting us out mid-test.
+- **Live test runtime ~3 min per keyword.** CI gated correctly behind `META_LIVE_TESTS=1` + `workflow_dispatch`; never runs on push. Important to keep this gate strict.
+- **Branch protection on main works** correctly with `gh pr merge --merge` strategy. The ruleset "Protect main" (16255967) blocks force-push and direct push; PRs merge cleanly via the standard `--merge` path.
 
 ### 2026-05-12 — Phase 3 in review
 
@@ -83,6 +91,10 @@ All three pre-conditions shipped:
 - **Tooling tidy:** ruff warns `ANN101` / `ANN102` are deprecated rules. The `pyproject.toml` mypy override for `tenacity.*` is currently unused (Phase 4 retry policies will make it live).
 - **`docs/contracts/ad-data-schema.md` claim about hashability is wrong.** `frozen=True` only auto-hashes when every field is hashable, and `Ad` has list fields. Fix the contract doc when revisiting it at Phase 6 (tests & coverage tightening).
 - **`.project/patterns/pytest-patterns/README.md` line 191** still says `pyproject.toml enforces --cov-fail-under=60`. Phase 0 deferred that to Phase 6 — sweep this and any other stale claims when Phase 6 re-adds the gate.
+- **Phase 5 polish:** `ad_creative_text` includes Meta's layout artifacts (zero-width spaces `​`, "Active"/"Inactive" label, "Started running on…" metadata, "Sponsored" marker, "Platforms" header). Real ad copy starts after "Sponsored\n". Strip these via a post-processor in `parsers/ad_card.py` for cleaner CSV/JSON output. Low priority — current output is functional and contains the right information, just verbose.
+- **Selector coupling between parser and scraper.** Both `iter_visible_ads` and the scraper's `_AD_CARD_SELECTOR` use the same text+xpath pattern. They must stay in sync. Phase 4 or Phase 6 should extract a shared constant.
+- **HAR-replay test for pagination** — currently nothing in CI proves `scroll_and_collect` works against actual scroll-XHR-driven DOM. Phase 6 should record HAR with scroll events and add an offline pagination test.
+- **`stall_threshold=3` is hardcoded** as a kwarg default, not CLI-exposed. If Meta's network is slow, premature stall is possible. Consider exposing as `--stall-threshold` flag in Phase 4 or making it adaptive to the rate-limiter.
 
 ---
 
@@ -93,8 +105,8 @@ All three pre-conditions shipped:
 | 0 — Bootstrap | 2026-05-11 | 2026-05-11T09:48Z | [#1](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/1) | Coverage gate deferred to Phase 6; two smoke tests cleared pytest exit-5 on empty scaffold; funding/sponsor surface added per template §4.3. Merged develop→main via `--merge` strategy at main SHA `3abfb3d`. |
 | 1 — MVP Keyword | 2026-05-11 | 2026-05-11T11:53Z | [#2](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/2) | 11 atomic commits. Live keyword smoke 0 ads (Swahili locale). HTML fixture captured for Phase 2 reconnaissance. Merged to develop. |
 | 2 — Three Search Paths | 2026-05-11 | 2026-05-11T21:24Z | (closed-and-replaced after history rewrite; merged on fresh repo) | 10 atomic commits, three pre-conditions + feature + mid-phase httpx→Playwright refactor. Live verified across all 3 modes. |
-| 3 — Pagination | 2026-05-12 | (in review) | (PR opening on push) | 6 atomic commits: pagination module + 15 unit tests + scraper integration + CLI flags + live smoke for multi-page + mid-phase selector fix. |
-| 4 — Resilience | — | — | — | — |
+| 3 — Pagination | 2026-05-12 | 2026-05-12T04:45Z | [#2](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/2) | 7 atomic commits. Pagination module + 15 unit tests + scraper integration + CLI flags + live smoke for multi-page + mid-phase selector fix. Merged at develop SHA `d7b28b9`. |
+| 4 — Resilience | — | — | — | Next phase. Tenacity retries, RateLimiter, structlog config, CLI flags `--rate-limit` / `--concurrency` / `-v` / `-vv`. |
 | 5 — CLI Polish & Resume | — | — | — | — |
 | 6 — Tests & CI | — | — | — | — |
 | 7 — APPROACH & Demo | — | — | — | — |
@@ -103,8 +115,8 @@ All three pre-conditions shipped:
 
 ## Active Worktree State
 
-- Branch: `feat/phase-3-pagination`
-- Uncommitted edits: this journal update
+- Branch: `develop`
+- Uncommitted edits: this journal update + BUILD-PLAN index
 - Stash: (none)
 
 ---

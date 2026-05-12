@@ -214,6 +214,7 @@ meta-ads-scraper/
 7. **Never push to main directly** — always via PR
 8. **Never combine phases** — one phase per PR
 9. **Never skip the `bootstrap.sh` verification on a fresh clone**
+10. **Never commit local working files, personal notes, or scratch artifacts.** These live in `.ai/` (gitignored) or external notes. The repo contains only production artifacts: code, tests, architecture docs, conventions, and changelog entries.
 
 ---
 

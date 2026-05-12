@@ -106,3 +106,7 @@ secrets.json
 *.key
 *.crt
 credentials.json
+
+# ─── Local working folders and personal notes ────────────────────
+.ai/
+scratch/

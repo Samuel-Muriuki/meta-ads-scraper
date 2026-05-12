@@ -126,8 +126,14 @@ addopts = [
 [tool.coverage.run]
 branch = true
 source = ["src/meta_ads_scraper"]
+omit = [
+    "src/meta_ads_scraper/__main__.py",
+]
 
 [tool.coverage.report]
+fail_under = 78
+show_missing = true
+skip_covered = false
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",

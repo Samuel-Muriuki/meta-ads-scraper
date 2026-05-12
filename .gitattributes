@@ -1,0 +1,18 @@
+# Force LF line endings on shell scripts (Windows-safe)
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Force LF on Python and config files for cross-platform consistency
+*.py text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Binary files
+*.har binary
+*.png binary
+*.pdf binary
+*.sqlite binary
+*.db binary

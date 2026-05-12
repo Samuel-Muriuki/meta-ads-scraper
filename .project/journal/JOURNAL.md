@@ -6,16 +6,27 @@
 
 ## Current Phase
 
-**Phase 4 — Resilience** (not yet started)
+**Phase 5 — CLI Polish & Resume** (in progress)
 
-**Phase 3 merge commit:** `d7b28b9` — `Merge pull request #2 from Samuel-Muriuki/feat/phase-3-pagination`
-**Main tip:** `9598b78` — Phase 0 closeout
+**Phase 4 merge commit:** `ed74e1d` — `Merge pull request #3 from Samuel-Muriuki/feat/phase-4-resilience`
+**Develop tip:** `ed74e1d` (will advance after this journal commit)
+**Main tip:** `9598b78` — Phase 0 closeout (unchanged; develop → main merge happens at submission)
+**Last completed phase:** Phase 4 — Resilience
 **Build path:** full BUILD-PLAN through Phase 7 (no scope cuts)
 **Submission deadline:** Monday 2026-05-13 9 PM Nairobi
 
 ---
 
 ## Recent Decisions
+
+### 2026-05-12 — Phase 4 closeout
+
+- **Option A predicate refinement for `@retry_network`.** The decorator catches httpx transport errors (`TimeoutException`, `ConnectError`, `ReadError`) AND Playwright errors filtered by `_is_retryable_playwright_error`. The predicate matches `str(exc).lower()` against `(net::err, navigation timeout, page closed, target closed)` so that genuine selector misses (which belong to `@retry_dom`) do not slip through. One decorator, two stacks; selector-shape failures still flow to the right policy.
+- **`_resolve_page_id` wrapped with `@retry_dom` per the Phase 4 prompt's pure-Playwright branch.** The method has been pure Playwright navigation since the Phase 2 httpx→Playwright refactor. `@retry_dom` retries only `PlaywrightTimeoutError`; non-timeout `PlaywrightError` (e.g. `net::ERR_*`) propagates without retry. Asymmetric with `_goto_with_retry` which uses `@retry_network`. Flagged for Phase 5+ review — if live runs surface `net::ERR_*` from the slug page, switch to `@retry_network` for symmetry.
+- **`RateLimiter` installed INSIDE `scroll_and_collect`, not wrapped around the whole scrape.** Each scroll iteration calls `rate_limiter.acquire()` at the top of the loop body. `wait_for_load_state`'s natural pacing is not sustained-load defense; per-iteration acquire is. Default kwarg `None` keeps the 15 existing pagination tests timing-free.
+- **structlog stdlib bridge enabled in `logging_config.py`.** Logs from Playwright, httpx, and tenacity (`before_sleep_log`) flow through the same processor chain and emit in the chosen renderer (JSON default, pretty console at `-vv`). Stable log event names locked in the module docstring: `scrape_start`, `no_cookie_consent_dialog`, `cookie_consent_dismissed`, `no_ads_visible`, `max_results_reached`, `pagination_stalled`, `pagination_timeout`, `pagination_stall_tick`, `shutdown_requested`, `page_id_resolve_start`, `page_id_resolved`, `max_results_zero_treated_as_unlimited`, `max_results_above_ceiling`, `rate_limit_concurrency_clamped` (14 names). No renames without a PR-level Architectural Decisions entry.
+- **`RateLimiter` concurrency-vs-queue-depth tradeoff documented inline.** Pre-merge calibration: a four-line comment above `acquire()` notes that the internal lock serialises the timed wait, so `max_concurrency > 1` provides queue-depth bound rather than parallel execution. Single-coroutine scrape path is the supported case. Lands in the rate-limit feature commit (`705a46e` post-rebase) rather than as a follow-up — preserves atomic discipline.
+- **No live smoke this phase per the Phase 4 directive.** Phase 4 is infrastructure, not capability. Budget preserved for Phase 5/7 demo runs against Hoski-relevant verticals. CI's `Live Smoke (Manual Only)` job stayed `SKIPPED` as designed (gated behind `META_LIVE_TESTS=1` + `workflow_dispatch`).
 
 ### 2026-05-12 — Phase 3 closeout
 
@@ -96,6 +107,14 @@ All three pre-conditions shipped:
 - **HAR-replay test for pagination** — currently nothing in CI proves `scroll_and_collect` works against actual scroll-XHR-driven DOM. Phase 6 should record HAR with scroll events and add an offline pagination test.
 - **`stall_threshold=3` is hardcoded** as a kwarg default, not CLI-exposed. If Meta's network is slow, premature stall is possible. Consider exposing as `--stall-threshold` flag in Phase 4 or making it adaptive to the rate-limiter.
 
+### Phase 4 followups (logged 2026-05-12)
+
+- **`_resolve_page_id` retry policy asymmetry.** Wrapped with `@retry_dom` per the Phase 4 prompt's pure-Playwright conditional, but the call shape (page.goto navigation) is identical to `_goto_with_retry` which uses `@retry_network`. Non-timeout `PlaywrightError` from the slug page (e.g. `net::ERR_*`) propagates without retry. If Phase 5+ live runs surface this, switch to `@retry_network` for symmetry.
+- **`_wait_for_first_card` is a natural `@retry_dom` candidate** that was deliberately not decorated in Phase 4 (stop condition honoured). It currently converts a `PlaywrightTimeoutError` into a clean "no ads" path. If live testing in Phase 5+ shows flaky first-card waits, decorate it then.
+- **`RateLimiter` concurrency semantics.** The internal lock serialises the timed wait, so `max_concurrency > 1` provides queue-depth bound rather than parallel execution. Reconsider the design if Phase 5+ introduces concurrent scraping across multiple `SearchSpec`s.
+- **`tenacity.*` mypy override is now live** — Phase 4 imports tenacity in production code. The earlier "currently unused" followup is cleared.
+- **Pre-existing followup remains:** `playwright_stealth.*` mypy override generates an "unused section" note (informational, not blocking). Sweep at Phase 6 along with the other mypy housekeeping.
+
 ---
 
 ## Phase Completion Log
@@ -106,8 +125,8 @@ All three pre-conditions shipped:
 | 1 — MVP Keyword | 2026-05-11 | 2026-05-11T11:53Z | [#2](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/2) | 11 atomic commits. Live keyword smoke 0 ads (Swahili locale). HTML fixture captured for Phase 2 reconnaissance. Merged to develop. |
 | 2 — Three Search Paths | 2026-05-11 | 2026-05-11T21:24Z | (closed-and-replaced after history rewrite; merged on fresh repo) | 10 atomic commits, three pre-conditions + feature + mid-phase httpx→Playwright refactor. Live verified across all 3 modes. |
 | 3 — Pagination | 2026-05-12 | 2026-05-12T04:45Z | [#2](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/2) | 7 atomic commits. Pagination module + 15 unit tests + scraper integration + CLI flags + live smoke for multi-page + mid-phase selector fix. Merged at develop SHA `d7b28b9`. |
-| 4 — Resilience | — | — | — | Next phase. Tenacity retries, RateLimiter, structlog config, CLI flags `--rate-limit` / `--concurrency` / `-v` / `-vv`. |
-| 5 — CLI Polish & Resume | — | — | — | — |
+| 4 — Resilience | 2026-05-12 | merged at `ed74e1d` | [#3](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/3) | 9 atomic commits, retry + rate-limit + logging layer, no live smoke per Phase 4 directive. Mid-phase rebase to bake the rate-limiter concurrency-vs-queue-depth comment into the rate-limit commit (`891b286` → `705a46e`). |
+| 5 — CLI Polish & Resume | 2026-05-12 (started) | — | — | In progress. SQLite checkpoint + resume subcommand, rich progress bar, production README, examples folder. |
 | 6 — Tests & CI | — | — | — | — |
 | 7 — APPROACH & Demo | — | — | — | — |
 
@@ -115,8 +134,8 @@ All three pre-conditions shipped:
 
 ## Active Worktree State
 
-- Branch: `develop`
-- Uncommitted edits: this journal update + BUILD-PLAN index
+- Branch: `develop` after Phase 4 merge (`ed74e1d`)
+- Uncommitted edits: this Phase 4 closeout journal update
 - Stash: (none)
 
 ---

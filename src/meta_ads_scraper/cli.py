@@ -9,6 +9,13 @@ from typing import Annotated, TextIO
 import structlog
 import typer
 from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from rich.table import Table
 
 from .checkpoint import CheckpointStore, RunSummary
@@ -121,6 +128,13 @@ def search(
             help="Increase log verbosity. -v = INFO, -vv = DEBUG (pretty console).",
         ),
     ] = 0,
+    no_progress: Annotated[
+        bool,
+        typer.Option(
+            "--no-progress",
+            help="Suppress the progress bar (auto-suppressed when stderr is not a TTY).",
+        ),
+    ] = False,
 ) -> None:
     """Start a fresh scrape and persist a checkpoint."""
     configure_logging(verbosity=verbose)
@@ -142,6 +156,7 @@ def search(
         timeout_seconds=timeout_seconds,
         rate_limit=rate_limit,
         concurrency=concurrency,
+        show_progress=not no_progress,
     )
 
     _write_output(ads, exporter=exporter, out=out)
@@ -209,6 +224,13 @@ def resume(
             help="Increase log verbosity. -v = INFO, -vv = DEBUG (pretty console).",
         ),
     ] = 0,
+    no_progress: Annotated[
+        bool,
+        typer.Option(
+            "--no-progress",
+            help="Suppress the progress bar (auto-suppressed when stderr is not a TTY).",
+        ),
+    ] = False,
 ) -> None:
     """Continue an interrupted scrape using a previously-started run_id."""
     configure_logging(verbosity=verbose)
@@ -235,6 +257,7 @@ def resume(
         timeout_seconds=timeout_seconds,
         rate_limit=rate_limit,
         concurrency=concurrency,
+        show_progress=not no_progress,
     )
 
     _write_output(ads, exporter=exporter, out=out)
@@ -317,6 +340,7 @@ def _execute_scrape(
     timeout_seconds: int,
     rate_limit: float,
     concurrency: int,
+    show_progress: bool,
 ) -> list[Ad]:
     """Run the scrape under a checkpoint lifecycle and return collected ads.
 
@@ -334,6 +358,7 @@ def _execute_scrape(
                 timeout_seconds=timeout_seconds,
                 rate_limit=rate_limit,
                 concurrency=concurrency,
+                show_progress=show_progress,
             )
         )
     except BaseException:
@@ -353,19 +378,38 @@ async def _drive_scraper(
     timeout_seconds: int,
     rate_limit: float,
     concurrency: int,
+    show_progress: bool,
 ) -> list[Ad]:
     ads: list[Ad] = []
-    async with PlaywrightScraper(
-        max_results=max_results,
-        timeout_seconds=timeout_seconds,
-        rate_limit=rate_limit,
-        concurrency=concurrency,
-        checkpoint=checkpoint,
-        run_id=run_id,
-        yielded_ids=yielded_ids,
-    ) as scraper:
-        async for ad in scraper.search(spec):
-            ads.append(ad)
+    # Console is stderr-only; the auto-detected TTY check determines whether
+    # the bar is actually rendered. Disable=True passes through silently.
+    console = Console(stderr=True)
+    progress_disabled = (not show_progress) or (not console.is_terminal)
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.completed} ads"),
+        TimeElapsedColumn(),
+        console=console,
+        disable=progress_disabled,
+    )
+
+    with progress:
+        task_total = max_results if (max_results and max_results > 0) else None
+        task = progress.add_task("Scraping ads", total=task_total)
+        async with PlaywrightScraper(
+            max_results=max_results,
+            timeout_seconds=timeout_seconds,
+            rate_limit=rate_limit,
+            concurrency=concurrency,
+            checkpoint=checkpoint,
+            run_id=run_id,
+            yielded_ids=yielded_ids,
+        ) as scraper:
+            async for ad in scraper.search(spec):
+                progress.update(task, advance=1)
+                ads.append(ad)
     return ads
 
 

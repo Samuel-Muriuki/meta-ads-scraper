@@ -111,3 +111,6 @@ credentials.json
 # ─── Local working folders and personal notes ────────────────────
 .ai/
 scratch/
+
+# ─── Editor / agent runtime state (never commit) ──────────────────
+.claude/

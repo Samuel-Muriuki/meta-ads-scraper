@@ -6,18 +6,29 @@
 
 ## Current Phase
 
-**Phase 6 — Tests & CI Hardening** (not yet started)
+**Phase 7 — APPROACH & Demo** (not yet started)
 
-**Phase 5 merge commit:** `6eb9e27` — `Merge pull request #4 from Samuel-Muriuki/feat/phase-5-cli-polish-resume`
-**Develop tip:** `6eb9e27` (will advance after this journal commit)
+**Phase 6 merge commit:** `91926c7` — `Merge pull request #5 from Samuel-Muriuki/feat/phase-6-tests-ci-hardening`
+**Develop tip:** `91926c7` (will advance after this journal commit)
 **Main tip:** `9598b78` — Phase 0 closeout (unchanged; develop → main merge happens at submission)
-**Last completed phase:** Phase 5 — CLI Polish & Resume
+**Last completed phase:** Phase 6 — Tests & CI Hardening
 **Build path:** full BUILD-PLAN through Phase 7 (no scope cuts)
 **Submission deadline:** Monday 2026-05-13 9 PM Nairobi
 
 ---
 
 ## Recent Decisions
+
+### 2026-05-12 — Phase 6 closeout
+
+- **Shared constants module instead of in-file duplication.** `src/meta_ads_scraper/constants.py` exports `AD_CARD_SELECTOR` and `AD_CARD_BOUNDARY_XPATH`. The chained selector is derived from the boundary xpath so the two cannot drift. Module docstring captures the Phase 3 hard-won selector history (xpath-only forms returned zero matches on Meta's live React DOM) so future maintainers don't relearn it.
+- **`_typed_exit_codes` as a decorator, not an inline wrapper.** Wraps each `@app.command` function (search, resume, runs). Cleaner than threading try/except blocks through each command body. Uses `ParamSpec` + `TypeVar` for proper generic typing — mypy strict + ruff `ANN401` both green, no `Any` in the *args/**kwargs signature.
+- **HAR-replay test uses `not_found="fallback"`.** Meta's page references CDN assets we did not capture; aborting on miss would fail the page load. The substantive assertion (≥ 20 ads parsed) catches the failure modes we care about. Caveat documented in the test docstring and surfaced as a Phase 6 followup.
+- **HAR fixture left at 11.5 MB.** Dropping the JS bundles (8 MB total) would break replay fidelity — Meta's React app needs them to render and trigger scroll-loaded ads. GitHub allows the size; clone cost accepted. `scripts/slim_har.py` filters by host + MIME type and scrubs `Cookie` / `Set-Cookie` / `Authorization` / `X-Fb-*` headers (85 values redacted).
+- **Coverage gate at 78% (one below current 79.12%).** Per the Phase 6 prompt's "current floor minus 1" rule for the 70-79% range. Leaves breathing room for incidental drops; followup logged to lift to 80% in Phase 7 once `playwright_scraper.py` coverage rises above its current 33%.
+- **Coverage gate enforced in `integration-replay` job, not `unit-tests`.** Unit-only coverage doesn't reach 78% (most of `playwright_scraper.py` is exercised only by integration tests). The fast-feedback unit-tests job passes `--cov-fail-under=0` to override the pyproject gate; the slow integration job runs the full non-live suite and inherits the 78% gate. Tests run twice across jobs but execute in parallel.
+- **`mypy.overrides` narrowed to `playwright_stealth.*` only.** Empirically verified via `py.typed` markers: `playwright` and `tenacity` ship type stubs and don't need the override; `playwright_stealth` doesn't. Inline comment in `pyproject.toml` explains the asymmetry so the next maintainer doesn't repeat the investigation.
+- **`02-architecture.md` Option (a) chosen** (remove `config.py` rather than build a settings module). `pydantic-settings` adds dependency weight without clear value at the current single-machine deployment scope. The two-channel configuration model (CLI flags + env vars) is documented honestly. Stale `scraper/api_scraper.py` reference also removed; the abstract `BaseScraper` exists for the future Path A swap.
 
 ### 2026-05-12 — Phase 5 closeout
 
@@ -130,9 +141,17 @@ All three pre-conditions shipped:
 
 - **Resume produces "new ads only" output.** The resume command does not rewrite the original `--out` file; merging the two output files is the caller's job. Document in `APPROACH.md` or add a `--merge-with` flag in Phase 6+ if usability feedback requests it.
 - **Checkpoint DB path is not CLI-configurable.** Defaults to `data/runs.sqlite`. Add `--db-path` if Phase 6+ tests need to point at a per-test sandbox, or if a Hoski deployment needs the DB on a different filesystem.
-- **`docs/architecture/08-cli-design.md` is stale.** It documents the planned exit-code table (0/1/2/3/4/5/130) which is aspirational — we haven't wired typed exit codes for `ScraperBlockedError` / timeout / network failures yet. Reconcile during Phase 6.
-- **`docs/architecture/02-architecture.md` lists `config.py`** in the module map; we never created that module. Either delete the reference or actually add pydantic-settings in Phase 6.
+- ✅ **`docs/architecture/08-cli-design.md` is stale.** ~~Reconcile during Phase 6.~~ Done in Phase 6 commit `ea813aa`.
+- ✅ **`docs/architecture/02-architecture.md` lists `config.py`** in the module map. ~~Either delete the reference or actually add pydantic-settings in Phase 6.~~ Done in Phase 6 commit `4f88f4a` — Option (a), reference removed.
 - **`Click 8.2` removed `mix_stderr=False`** on `CliRunner`, so the test suite can no longer assert "X went to stderr only". The runs-to-stderr discipline is enforced architecturally via `Console(stderr=True)`. If Phase 6 wants behavioural coverage, switch to subprocess-based tests for the few stderr/stdout split assertions.
+
+### Phase 6 followups (logged 2026-05-12)
+
+- **Coverage gate set at 78% (one below current 79.12%).** Raise to 80% in Phase 7 once additional `playwright_scraper.py` paths are covered. The current 33% on that module is the biggest remaining gap; live tests cover it end-to-end but not at the unit level.
+- **HAR replay test uses `not_found="fallback"`.** Missing entries fall through to the live network. If a CI runner ever loses public-internet egress, the test starts producing flakes; switch to `not_found="abort"` then and recapture the HAR to be self-contained.
+- **HAR fixture is keyword-mode only.** Page-slug and page-url paths have no offline replay coverage. Capture additional HARs in Phase 7 if Loom demo recording surfaces any flakiness on those paths.
+- **`scripts/api_scraper.py` is referenced in `BaseScraper` docstrings as a future Path A.** No concrete plan to build it. Either delete the references when Path A is formally killed, or wire it up post-submission as a portfolio enhancement.
+- **`coverage.xml` is uploaded as a CI artifact** but not consumed anywhere. Hook up Codecov or a similar trending service when an account exists.
 
 ---
 
@@ -146,15 +165,15 @@ All three pre-conditions shipped:
 | 3 — Pagination | 2026-05-12 | 2026-05-12T04:45Z | [#2](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/2) | 7 atomic commits. Pagination module + 15 unit tests + scraper integration + CLI flags + live smoke for multi-page + mid-phase selector fix. Merged at develop SHA `d7b28b9`. |
 | 4 — Resilience | 2026-05-12 | merged at `ed74e1d` | [#3](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/3) | 9 atomic commits, retry + rate-limit + logging layer, no live smoke per Phase 4 directive. Mid-phase rebase to bake the rate-limiter concurrency-vs-queue-depth comment into the rate-limit commit (`891b286` → `705a46e`). |
 | 5 — CLI Polish & Resume | 2026-05-12 | merged at `6eb9e27` | [#4](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/4) | 10 atomic commits, checkpoint + resume + runs + progress bar + production README, two live runs to `examples/`. |
-| 6 — Tests & CI | — | — | — | — |
+| 6 — Tests & CI Hardening | 2026-05-12 | merged at `91926c7` | [#5](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/5) | 9 atomic commits, shared constants + typed exit codes + HAR replay + 78% coverage gate + mypy and doc cleanup. |
 | 7 — APPROACH & Demo | — | — | — | — |
 
 ---
 
 ## Active Worktree State
 
-- Branch: `develop` after Phase 5 merge (`6eb9e27`)
-- Uncommitted edits: this Phase 5 closeout journal update
+- Branch: `develop` after Phase 6 merge (`91926c7`)
+- Uncommitted edits: this Phase 6 closeout journal update
 - Stash: (none)
 
 ---

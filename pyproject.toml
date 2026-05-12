@@ -103,8 +103,11 @@ warn_return_any = true
 no_implicit_reexport = true
 strict_equality = true
 
+# playwright and tenacity ship `py.typed`, so their stubs work without an
+# override. playwright-stealth does NOT ship `py.typed`, so we keep the
+# override scoped narrowly to that one module.
 [[tool.mypy.overrides]]
-module = ["playwright.*", "playwright_stealth.*", "tenacity.*"]
+module = ["playwright_stealth.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

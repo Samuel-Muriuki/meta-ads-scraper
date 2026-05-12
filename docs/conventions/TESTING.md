@@ -8,8 +8,13 @@
 
 ## Coverage gate
 
-- `--cov-fail-under=60` overall (CI enforced)
-- Higher targets per-module in `.project/patterns/pytest-patterns/README.md`
+- `fail_under = 78` in `pyproject.toml` (CI-enforced in the
+  Integration + Coverage Gate job, see `.github/workflows/ci.yml`)
+- Current overall coverage: 78–79% — gate sits one point below the
+  measured floor; followup to raise to 80% once additional
+  `playwright_scraper.py` paths are unit-covered.
+- Per-module aspirational targets in
+  `.project/patterns/pytest-patterns/README.md`
 
 ## What every PR adds
 

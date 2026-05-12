@@ -71,6 +71,22 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ---
 
+### Documentation drift audit (2026-05-12)
+
+#### Fixed
+- `docs/contracts/ad-data-schema.md`: corrected the false "frozen → hashable" claim (`Ad` has list fields, so `hash(ad)` raises `TypeError`); replaced the non-existent JSON fixture references (`commercial_minimal.json` etc.) with the actual HTML + HAR fixtures we use.
+- `docs/architecture/01-overview.md`: Quick-start examples now mention the `outputs/` convention; added `runs` invocation alongside `search` and `resume`.
+- `docs/architecture/05-anti-detection.md`: locale section rewritten to reflect the actual triple-layer en_US forcing (BrowserContext + Accept-Language header + URL param), `--country` flag clarified as reserved-but-unwired, pacing section now describes the real `RateLimiter` (1.0 req/sec default + max-concurrency ceiling) instead of the never-implemented 1.5-3.5s jitter, persistent storage state marked NOT implemented.
+- `docs/architecture/06-pagination.md`: graceful-shutdown snippet replaced with the actual `try/except asyncio.CancelledError` pattern + pointer to `_typed_exit_codes`.
+- `docs/architecture/08-cli-design.md`: added a note documenting `--out` resolution behaviour (bare filename → `outputs/`; full path → pass-through).
+- `docs/architecture/10-testing-strategy.md`: coverage target updated 80% → 78%; HAR replay example updated to the actual fixture path (`keyword_shoes_paginated.har`) and the `not_found="fallback"` parameter.
+- `docs/conventions/TESTING.md`: coverage gate corrected 60 → 78 with note on the CI split (unit-tests job overrides `--cov-fail-under=0`; integration job enforces).
+- `.project/patterns/playwright-scraping/README.md`: stealth API updated to `Stealth().apply_stealth_async(page)` (2.x class form; 1.x crashes on Python 3.13).
+- `.project/patterns/pydantic-models/README.md`: corrected hashability claim and reframed the pydantic-settings section as "not used today" with rationale.
+- `.project/patterns/pytest-patterns/README.md`: coverage gate corrected 60 → 78 with CI-split explanation.
+
+---
+
 ## Phase Tags (added as phases complete)
 
 - `phase-0-bootstrap` — Initial scaffold

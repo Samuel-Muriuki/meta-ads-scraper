@@ -49,23 +49,25 @@ The stall threshold is a fail-safe: if 3 consecutive scrolls each wait the full 
 
 ## Graceful shutdown on Ctrl+C
 
+The actual implementation does not register an explicit signal
+handler. Instead `scroll_and_collect` runs inside a `try/except
+asyncio.CancelledError` block; Python's default SIGINT handling
+delivers `KeyboardInterrupt`, which propagates as `CancelledError`
+through the asyncio scheduler into the generator:
+
 ```python
-import signal
-
-shutdown_event = asyncio.Event()
-
-def _signal_handler():
-    shutdown_event.set()
-
-asyncio.get_event_loop().add_signal_handler(signal.SIGINT, _signal_handler)
-
-# In the loop:
-if shutdown_event.is_set():
-    logger.info("shutdown_requested", scraped_so_far=len(yielded_ids))
-    break
+try:
+    while True:
+        # ... scroll / collect / yield ...
+except asyncio.CancelledError:
+    logger.info("shutdown_requested", yielded=len(yielded))
+    raise  # propagate so the caller unwinds the browser context
 ```
 
-Already-scraped ads are flushed to disk via the exporter before exit. Partial outputs are valid; we don't truncate.
+The CLI's outermost `_typed_exit_codes` decorator catches the
+resulting `KeyboardInterrupt` and exits with code 130. Already-yielded
+ads are flushed by the exporter call that happens after the async-for
+loop returns. Partial outputs are valid; we don't truncate.
 
 ## Dedup discipline
 

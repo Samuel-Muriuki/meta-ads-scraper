@@ -188,4 +188,11 @@ await context.close()  # writes HAR
 | cli.py | ≥70% |
 | scraper/playwright_scraper.py | ≥50% (rest via integration) |
 
-`pyproject.toml` enforces `--cov-fail-under=60` overall.
+`pyproject.toml` enforces `fail_under = 78` overall in
+`[tool.coverage.report]`. CI runs the gate in the
+"Integration (HAR Replay) + Coverage Gate" job, which runs the full
+non-live suite so the gate sees the complete code surface. The
+unit-only `Unit Tests` job overrides with `--cov-fail-under=0` for
+fast feedback during PR iteration. Current measurement: 78–79%;
+followup logged to lift to 80% once `playwright_scraper.py` gets
+more unit coverage.

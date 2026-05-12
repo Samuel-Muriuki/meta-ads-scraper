@@ -128,7 +128,13 @@ def search(
     ] = "json",
     out: Annotated[
         Path | None,
-        typer.Option("--out", help="Output file path. Defaults to stdout."),
+        typer.Option(
+            "--out",
+            help=(
+                "Output file path. Bare filenames land in `outputs/`; full paths used "
+                "as-is. Omitted: prints to stdout."
+            ),
+        ),
     ] = None,
     max_results: Annotated[
         int | None,
@@ -204,7 +210,7 @@ def search(
         show_progress=not no_progress,
     )
 
-    _write_output(ads, exporter=exporter, out=out)
+    _write_output(ads, exporter=exporter, out=_resolve_output_path(out))
 
 
 # ---------------------------------------------------------------------------
@@ -225,8 +231,9 @@ def resume(
         typer.Option(
             "--out",
             help=(
-                "Output file path for NEW ads only. The resumed run does not "
-                "rewrite the original output; merge yourself if you need a combined file."
+                "Output file path for NEW ads only. Bare filenames land in `outputs/`; "
+                "full paths used as-is. The resumed run does not rewrite the original "
+                "output; merge yourself if you need a combined file."
             ),
         ),
     ] = None,
@@ -306,7 +313,7 @@ def resume(
         show_progress=not no_progress,
     )
 
-    _write_output(ads, exporter=exporter, out=out)
+    _write_output(ads, exporter=exporter, out=_resolve_output_path(out))
 
 
 # ---------------------------------------------------------------------------
@@ -366,6 +373,25 @@ def _clamp_rate_limit(rate_limit: float) -> float:
     if rate_limit > _MAX_RATE_LIMIT:
         raise typer.BadParameter(f"--rate-limit must be <= {_MAX_RATE_LIMIT}, got {rate_limit}")
     return rate_limit
+
+
+def _resolve_output_path(out: Path | None) -> Path | None:
+    """Resolve `--out`: bare filenames go to ``outputs/``; full paths pass through.
+
+    Default behaviour for users running `... --out shoes.json` from the repo
+    root is to land the file in `outputs/shoes.json` rather than dumping it
+    next to the source tree. Callers passing a path with any directory
+    component (``./shoes.json``, ``/tmp/shoes.json``, ``data/x.json``) get
+    that path back unchanged.
+    """
+    if out is None:
+        return None
+    # Path("foo.json").parent == Path(".") -> bare filename
+    if out.parent == Path("."):
+        outputs_dir = Path("outputs")
+        outputs_dir.mkdir(exist_ok=True)
+        return outputs_dir / out.name
+    return out
 
 
 def _build_spec(*, keyword: str | None, page_url: str | None, page_slug: str | None) -> SearchSpec:

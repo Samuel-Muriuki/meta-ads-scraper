@@ -97,6 +97,10 @@ data/
 *.db
 *.db-journal
 
+# ─── User scrape outputs ─────────────────────────────────────────
+outputs/*
+!outputs/.gitkeep
+
 # ─── Logs ─────────────────────────────────────────────────────────
 *.log
 logs/

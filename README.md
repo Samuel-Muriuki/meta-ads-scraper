@@ -33,19 +33,26 @@ already-scraped ads de-duplicated.
 
 ## Quick start
 
+Clone the repo:
+
 ```bash
 git clone https://github.com/Samuel-Muriuki/meta-ads-scraper.git
 cd meta-ads-scraper
 ```
 
-**macOS / Linux:**
+### macOS / Linux
 
 ```bash
-bash bootstrap.sh
+bash bootstrap.sh        # interactive — prompts for git author on first run
 source .venv/bin/activate
 ```
 
-**Windows (PowerShell):**
+The bootstrap script creates a virtualenv, installs all dependencies,
+installs Playwright's Chromium browser, and verifies the setup. It
+prompts for your git author name and email on first run if they are
+not already configured for the repository.
+
+### Windows (PowerShell)
 
 ```powershell
 python -m venv .venv
@@ -54,22 +61,32 @@ pip install -e .
 playwright install chromium
 ```
 
-Both produce the same result: virtualenv created, dependencies
-installed, Playwright Chromium installed. `bootstrap.sh` will prompt
-for your git author name + email on first run if they are not already
-configured for the repository.
+The `bootstrap.sh` script is not Windows-compatible (bash + LF-only).
+The four commands above produce the same end state.
+
+### First run
 
 ```bash
-# First run: keyword search, 10 ads, JSON to stdout
 python -m meta_ads_scraper search --keyword "running shoes" --max-results 10
 ```
+
+Output goes to stdout by default. To write to a file:
+
+```bash
+python -m meta_ads_scraper search --keyword "running shoes" \
+    --max-results 10 --out shoes.json
+```
+
+The file lands at `outputs/shoes.json` — bare filenames are auto-prefixed
+with `outputs/`, which is created automatically and gitignored. Pass a
+full path (`--out /tmp/x.json` or `--out data/x.json`) to override.
 
 The first run takes ~30 seconds for a keyword search, ~60 seconds for a
 page-slug search (one extra navigation to resolve the slug to a
 page_id). Logs go to stderr; the JSON or CSV payload goes to stdout
-(or `--out file` if you'd rather skip the pipe). The `run-id` printed
-to stderr is a 32-character hex string (uuid4 with dashes stripped);
-it's the handle for `resume <run-id>` later.
+when `--out` is omitted. The `run-id` printed to stderr is a
+32-character hex string (uuid4 with dashes stripped); it's the handle
+for `resume <run-id>` later.
 
 ### Demo runs
 
@@ -78,7 +95,9 @@ of live runs against Meta's Ad Library — three vertical demos
 (jewelry, dental, automotive) plus a 500-ad sustained-load
 demonstration. Read `examples/README.md` for the exact commands,
 durations, and run-ids. Use those files to see what the schema looks
-like populated without spending your own rate-limit budget.
+like populated without spending your own rate-limit budget. New runs
+that you launch yourself default to writing under `outputs/` (see
+[First run](#first-run)).
 
 ## Commands
 
@@ -125,17 +144,32 @@ Status, and Ads.
 ### Worked examples
 
 ```bash
-# Keyword search, write CSV
+# Keyword search, write CSV (lands at outputs/dental.csv)
 python -m meta_ads_scraper search --keyword "dental practices" \
     --max-results 50 --format csv --out dental.csv
 
-# Page slug, JSON to a file
+# Page slug, JSON to a file (lands at outputs/nike.json)
 python -m meta_ads_scraper search --page-slug Nike --format json \
     --out nike.json
+```
 
+`jq` is a popular JSON-processing tool installed separately via your
+system package manager (`brew install jq` on macOS, `sudo apt install
+jq` on Ubuntu/Debian, `choco install jq` on Windows, or download from
+<https://stedolan.github.io/jq/>). If it is installed, you can pipe
+the scraper's JSON output straight into it:
+
+```bash
 # Page URL, stream JSON through jq
 python -m meta_ads_scraper search \
     --page-url https://www.facebook.com/Nike | jq '.[].ad_library_id'
+```
+
+If `jq` is not installed, a Python one-liner does the same job:
+
+```bash
+python -m meta_ads_scraper search --page-url https://www.facebook.com/Nike \
+  | python -c "import json,sys; print('\n'.join(a['ad_library_id'] for a in json.load(sys.stdin)))"
 ```
 
 ## Architecture
@@ -152,13 +186,14 @@ cover each subsystem.
 src/meta_ads_scraper/
 ├── cli.py                       # Typer entrypoint (search / resume / runs)
 ├── checkpoint.py                # SQLite-backed run + ad store
-├── exceptions.py
+├── constants.py                 # AD_CARD_SELECTOR / AD_CARD_BOUNDARY_XPATH
+├── exceptions.py                # MetaAdsScraperError hierarchy
 ├── logging_config.py            # structlog + stdlib bridge
 ├── models.py                    # Ad, SearchSpec
 ├── pagination.py                # scroll_and_collect async generator
 ├── parsers/ad_card.py           # DOM locator -> Ad
 ├── rate_limit.py                # asyncio.Semaphore-based limiter
-├── retry.py                     # tenacity policies
+├── retry.py                     # tenacity policies (@retry_network / _rate_limited / _dom)
 ├── scraper/
 │   ├── base.py                  # BaseScraper abstract
 │   └── playwright_scraper.py    # Path B (public UI via Playwright)
@@ -177,6 +212,17 @@ src/meta_ads_scraper/
 | Headless | `PLAYWRIGHT_HEADLESS=0` env | `1` (headless) | Set to `0` to watch the browser during development. |
 | Verbosity | `-v` / `-vv` | 0 (WARNING) | `-v` → INFO JSON, `-vv` → DEBUG pretty console. |
 | Checkpoint DB | (not configurable) | `data/runs.sqlite` | `data/` is gitignored. Delete the file to clear history. |
+| Output folder | `--out <filename>` | `outputs/<filename>` | Bare filenames auto-prefix with `outputs/`. Full paths (`--out /tmp/x.json`) override. `outputs/` is gitignored. |
+
+### Optional system tools
+
+These are not required to run the scraper but can be useful for
+post-processing output:
+
+- **`jq`** — JSON query/transformation tool. Install via your system
+  package manager (`brew install jq` / `apt install jq` /
+  `choco install jq`). All `jq` examples in this README can be
+  replaced with Python one-liners if not installed.
 
 ### Locale forcing
 

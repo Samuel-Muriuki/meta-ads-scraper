@@ -27,6 +27,18 @@ All notable changes to this project are documented here. Format follows [Keep a 
 - 20 unit tests in `tests/unit/test_checkpoint.py`; 11 new CLI tests in `tests/unit/test_cli.py`
 - Production `README.md` replacing the Phase 0 placeholder
 - `examples/keyword_shoes.json` and `examples/page_slug_nike.csv` from controlled live runs at 0.5 req/sec
+- HAR-replay integration test (`tests/integration/test_pagination_har_replay.py`) covering the scroll loop offline
+- `scripts/capture_pagination_har.py` + `scripts/slim_har.py` reproducers for the HAR fixture
+- Typed CLI exit codes (0, 1, 2, 3, 4, 5, 130) wired via `_typed_exit_codes` decorator per `docs/architecture/08-cli-design.md`
+- Coverage gate enforced at 78% on CI (current: 79.12%); coverage XML uploaded as a CI artifact
+
+### Changed
+- `AD_CARD_SELECTOR` and `AD_CARD_BOUNDARY_XPATH` extracted to `src/meta_ads_scraper/constants.py`; parser and scraper now reference the same definition
+- `docs/architecture/08-cli-design.md` reconciled with the implemented CLI surface (search/resume/runs + the exit-code table)
+- `docs/architecture/02-architecture.md` module map: removed stale `config.py` reference, added `constants.py`, dropped non-existent `scraper/api_scraper.py`
+
+### Fixed
+- `[[tool.mypy.overrides]]` narrowed to `playwright_stealth.*` only (playwright and tenacity now ship `py.typed`); "unused section" mypy note resolved
 
 ---
 

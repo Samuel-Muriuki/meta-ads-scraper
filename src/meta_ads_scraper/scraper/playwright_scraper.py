@@ -45,11 +45,7 @@ _COOKIE_TIMEOUT = 3_000
 _LOGIN_PROBE_TIMEOUT = 1_000
 _PAGE_ID_NAV_TIMEOUT = 30_000
 _DEFAULT_SCRAPE_TIMEOUT_S = 300
-_AD_CARD_XPATH = (
-    "xpath=//div"
-    "[.//text()[contains(., 'Library ID:')] and .//img]"
-    "[not(.//div[.//text()[contains(., 'Library ID:')]])]"
-)
+_AD_CARD_SELECTOR = r"text=/Library ID:\s*\d+/ >> xpath=ancestor::div[.//img][1]"
 
 
 class PlaywrightScraper(BaseScraper):
@@ -115,7 +111,7 @@ class PlaywrightScraper(BaseScraper):
 
         async for card in scroll_and_collect(
             page,
-            _AD_CARD_XPATH,
+            _AD_CARD_SELECTOR,
             max_results=self._max_results,
             timeout_seconds=self._timeout_seconds,
         ):

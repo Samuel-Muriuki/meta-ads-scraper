@@ -15,19 +15,31 @@ Respectful, not adversarial. We want to look like a normal browser at slow human
 ### 2. Realistic browser context
 - Viewport: 1920x1080 (most common desktop)
 - User agent: real Chrome version, no "HeadlessChrome"
-- Locale: from `--country` or default `en-US`
-- Timezone: aligned with locale
+- Locale: hard-coded `en-US` plus `Accept-Language: en-US,en;q=0.9`
+  plus `&locale=en_US` in every Meta URL. Triple-layered to defeat
+  Meta's GeoIP localisation (without it, Kenyan IPs render in
+  Swahili). `--country` was reserved on the `SearchSpec` model but
+  not wired through the URL resolver; not currently a knob.
+- Timezone: hard-coded `America/New_York` to align with the en-US
+  locale.
 
-### 3. Persistent storage state
-Save cookies + localStorage after first successful run. Reuse on subsequent runs. Looks like a returning user.
+### 3. Persistent storage state (NOT implemented today)
+The original plan was to save cookies + localStorage after the first
+run and reuse on subsequent runs. This is not currently implemented;
+each run launches a fresh Chromium context. Revisit if rate-limit
+penalties surface during sustained operation.
 
-### 4. Human-like pacing
-- Default: 1.5–3.5s jitter between actions
-- Configurable via `--rate-limit` flag
-- Never click multiple times in quick succession
+### 4. Steady pacing via `RateLimiter`
+- Default: 1.0 req/sec, max concurrency 1 (hard ceiling 3).
+- Configurable via `--rate-limit` (clamped `[0.1, 10.0]`) and
+  `--concurrency`.
+- The limiter sits **inside** `scroll_and_collect` so each scroll
+  iteration is paced -- not just the scrape as a whole.
 
 ### 5. Respect Retry-After
-On 429, honor the header. Don't immediately retry.
+The `@retry_rate_limited` tenacity policy honours
+`RateLimitedError.retry_after` when set; otherwise it falls back to
+60s + jitter.
 
 ## What we don't do
 

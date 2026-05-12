@@ -16,7 +16,7 @@ See `.project/patterns/pytest-patterns/README.md` for patterns.
     └──────────────────────────┘
 ```
 
-## Unit tests (target: 80%+ coverage of leaf modules)
+## Unit tests (target: 78%+ overall; per-module targets in `.project/patterns/pytest-patterns/README.md`)
 
 Cover:
 - `models.py` — Pydantic validation, serialization, edge cases
@@ -33,10 +33,18 @@ Use Playwright's HAR replay mode:
 
 ```python
 context = await browser.new_context()
-await context.route_from_har("tests/fixtures/har/keyword_shoes.har", update=False)
+await context.route_from_har(
+    "tests/fixtures/har/keyword_shoes_paginated.har",
+    not_found="fallback",
+)
 ```
 
-This means CI doesn't need internet to run integration tests. The HAR is captured once locally and committed.
+This means CI doesn't need internet to run integration tests. The HAR
+is captured once locally and committed (see
+`scripts/capture_pagination_har.py` and `scripts/slim_har.py` for the
+reproducer). `not_found="fallback"` accommodates Meta's lazy-loaded
+CDN assets that the captured HAR cannot anticipate -- the substantive
+assertion (>=20 ads parsed) catches the failure modes we care about.
 
 ## Live smoke (gated)
 

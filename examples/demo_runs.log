@@ -1,0 +1,56 @@
+Phase 7 vertical demo runs against live Meta Ad Library.
+All three executed with --rate-limit 0.5 --max-results 25 --no-progress.
+
+================================================================================
+Run 1 — Jewelry vertical
+================================================================================
+Command:    python -m meta_ads_scraper search --keyword "diamond jewelry"
+            --max-results 25 --rate-limit 0.5 --format json
+            --out examples/jewelry_demo.json --no-progress
+Start UTC:  2026-05-12T13:07:54.5417803Z
+End UTC:    2026-05-12T13:14:41.9659032Z
+Duration:   407.16 s (6 min 47 s)
+Run ID:     359055d793f54882bd1d09cdfdb6b580
+Ads:        25 (reached max-results cap)
+Retries:    none observed in stderr
+Warnings:   none
+
+================================================================================
+Run 2 — Dental vertical
+================================================================================
+Command:    python -m meta_ads_scraper search --keyword "dental implants"
+            --max-results 25 --rate-limit 0.5 --format json
+            --out examples/dental_demo.json --no-progress
+Start UTC:  2026-05-12T13:15:38.0118154Z
+End UTC:    2026-05-12T13:23:17.3911993Z
+Duration:   458.90 s (7 min 39 s)
+Run ID:     bede87b375d346638c99ad206247b076
+Ads:        24 (pagination_stalled before reaching cap — natural end for a
+            less-saturated keyword vertical)
+Retries:    none observed in stderr
+Warnings:   none
+
+================================================================================
+Run 3 — Automotive vertical
+================================================================================
+Command:    python -m meta_ads_scraper search --keyword "luxury cars"
+            --max-results 25 --rate-limit 0.5 --format json
+            --out examples/automotive_demo.json --no-progress
+Start UTC:  2026-05-12T13:30:19.9616527Z
+End UTC:    2026-05-12T13:35:56.6520365Z
+Duration:   336.59 s (5 min 37 s)
+Run ID:     53fbda4826114c4d995763153decca37
+Ads:        25 (reached max-results cap)
+Retries:    none observed in stderr
+Warnings:   none
+
+================================================================================
+Aggregate
+================================================================================
+Total ads:       74 across 3 verticals
+Total wall-time: ~20 min 03 s
+Mean ads/min:    ~3.7 (capped by the 0.5 req/sec polite-pacing default)
+Failure rate:    0 / 3 runs
+Retry events:    0
+Stall events:    1 (dental — clean shutdown via pagination_stalled, expected
+                 behaviour when a keyword's tail of fresh ads runs out)

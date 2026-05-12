@@ -39,6 +39,19 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Fixed
 - `[[tool.mypy.overrides]]` narrowed to `playwright_stealth.*` only (playwright and tenacity now ship `py.typed`); "unused section" mypy note resolved
+- `.claude/` runtime state directory added to `.gitignore` (audit confirmed no historical contamination; forward-looking fix)
+
+---
+
+### Phase 7 — submission deliverables (2026-05-12)
+
+#### Added
+- `APPROACH.md` submission narrative at the repo root (968 words)
+- Three vertical demo outputs in `examples/` (jewelry, dental, automotive) plus `examples/demo_runs.log`
+- `examples/stress_test_500ads.json` + annotated `examples/stress_test.log` from the 500-ad sustained-load demonstration
+
+#### Notes
+- Coverage gate remains at 78%. Local measurement is 79.12% (below the 80% lift threshold); raising the gate requires additional unit coverage on `playwright_scraper.py` and is deferred
 
 ---
 

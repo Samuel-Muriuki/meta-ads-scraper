@@ -10,6 +10,16 @@ All notable changes to this project are documented here. Format follows [Keep a 
 - Phase-by-phase build plan
 - Engineering manual + project journal
 - CI pipeline (lint, type-check, unit tests, integration replay)
+- `retry.py` with `@retry_network`, `@retry_rate_limited`, `@retry_dom` tenacity policies
+- `_is_retryable_playwright_error` predicate covering `net::err`, `navigation timeout`, `page closed`, `target closed` signatures so `@retry_network` spans httpx and Playwright transport failures
+- `rate_limit.py` with `RateLimiter` (`asyncio.Semaphore` + monotonic-clock pacing) and `MAX_CONCURRENCY_CEILING = 3`
+- `logging_config.py` exposing `configure_logging(verbosity)` with stdlib bridge for Playwright/httpx/tenacity logs
+- `RateLimitedError.retry_after` attribute for honouring server `Retry-After` hints
+- `PlaywrightScraper` accepts `rate_limit` and `concurrency` kwargs; RateLimiter gates each scroll iteration
+- `@retry_dom` applied to `_scroll_to_bottom` and the new `_wait_for_networkidle` helper in `pagination.py`
+- `@retry_network` applied to `_goto_with_retry` and `@retry_dom` to `_resolve_page_id` in `playwright_scraper.py`
+- CLI flags: `--rate-limit`, `--concurrency`, `-v` / `--verbose` (count-style for `-vv`)
+- Unit tests: 13 in `tests/unit/test_retry.py`, 8 in `tests/unit/test_rate_limit.py`, 1 JSON shape smoke in `tests/unit/test_logging.py`
 
 ---
 

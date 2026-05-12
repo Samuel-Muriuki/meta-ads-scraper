@@ -22,6 +22,8 @@ from ..exceptions import PageResolutionError, ScraperBlockedError
 from ..models import Ad, SearchSpec
 from ..pagination import scroll_and_collect
 from ..parsers.ad_card import parse_ad_card
+from ..rate_limit import RateLimiter
+from ..retry import retry_dom, retry_network
 from ..url_resolver import PAGE_ID_PATTERNS, resolve_url
 from .base import BaseScraper
 
@@ -45,6 +47,8 @@ _COOKIE_TIMEOUT = 3_000
 _LOGIN_PROBE_TIMEOUT = 1_000
 _PAGE_ID_NAV_TIMEOUT = 30_000
 _DEFAULT_SCRAPE_TIMEOUT_S = 300
+_DEFAULT_RATE_LIMIT = 1.0
+_DEFAULT_CONCURRENCY = 1
 _AD_CARD_SELECTOR = r"text=/Library ID:\s*\d+/ >> xpath=ancestor::div[.//img][1]"
 
 
@@ -55,12 +59,18 @@ class PlaywrightScraper(BaseScraper):
         headless: bool | None = None,
         max_results: int | None = None,
         timeout_seconds: int = _DEFAULT_SCRAPE_TIMEOUT_S,
+        rate_limit: float = _DEFAULT_RATE_LIMIT,
+        concurrency: int = _DEFAULT_CONCURRENCY,
     ) -> None:
         if headless is None:
             headless = os.environ.get("PLAYWRIGHT_HEADLESS", "1") != "0"
         self._headless = headless
         self._max_results = max_results
         self._timeout_seconds = timeout_seconds
+        self._rate_limiter = RateLimiter(
+            requests_per_second=rate_limit,
+            max_concurrency=concurrency,
+        )
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
@@ -100,7 +110,7 @@ class PlaywrightScraper(BaseScraper):
         url = await resolve_url(spec, page_id_resolver=self._resolve_page_id)
         logger.info("scrape_start", url=url, mode=spec.mode, query=spec.query)
 
-        await page.goto(url, wait_until="domcontentloaded", timeout=_DEFAULT_NAV_TIMEOUT)
+        await self._goto_with_retry(url)
         await self._dismiss_cookie_consent(page)
 
         if not await self._wait_for_first_card(page):
@@ -114,10 +124,24 @@ class PlaywrightScraper(BaseScraper):
             _AD_CARD_SELECTOR,
             max_results=self._max_results,
             timeout_seconds=self._timeout_seconds,
+            rate_limiter=self._rate_limiter,
         ):
             ad = await parse_ad_card(card, source_url=url)
             if ad is not None:
                 yield ad
+
+    @retry_network
+    async def _goto_with_retry(self, url: str) -> None:
+        """Navigate to ``url`` with transport-failure retries.
+
+        Wrapped in ``@retry_network`` so that httpx transport errors and
+        Playwright transport-shaped failures (``net::err``, navigation
+        timeout, target/page closed) are retried with exponential backoff.
+        Genuine selector misses are not retried here — they surface up the
+        stack and are handled by ``_wait_for_first_card``.
+        """
+        assert self._page is not None  # guaranteed by entry check in search()
+        await self._page.goto(url, wait_until="domcontentloaded", timeout=_DEFAULT_NAV_TIMEOUT)
 
     async def _dismiss_cookie_consent(self, page: Page) -> None:
         try:
@@ -140,7 +164,19 @@ class PlaywrightScraper(BaseScraper):
         login_button = page.get_by_role("button", name=_LOGIN_PROMPT_RE).first
         return await login_button.is_visible(timeout=_LOGIN_PROBE_TIMEOUT)
 
+    @retry_dom
     async def _resolve_page_id(self, slug: str) -> str:
+        """Resolve a page slug to a numeric page_id via Playwright navigation.
+
+        Wrapped in ``@retry_dom`` per the Phase 4 prompt's pure-Playwright
+        branch (this method has no httpx call since the Phase 2 refactor).
+        That gives one retry on ``PlaywrightTimeoutError`` with a 2s fixed
+        wait. Non-timeout ``PlaywrightError`` failures (e.g. ``net::err``)
+        propagate without retry; if Phase 5+ live runs surface these, the
+        followup is to either broaden the retry here to ``@retry_network``
+        (same call shape as ``_goto_with_retry``) or to split off a
+        navigation-specific policy.
+        """
         if self._page is None:
             raise RuntimeError("PlaywrightScraper not entered — use `async with`")
         page = self._page

@@ -37,7 +37,26 @@ Read these files in order:
 
 Then do the following:
 
-1. Run `bash bootstrap.sh` to set up git config, virtualenv, install dependencies, install Playwright browsers (Chromium only), and run `ruff check` + `pytest` to verify the empty scaffold works.
+1. Run the bootstrap script for your platform:
+
+   **macOS/Linux:**
+
+   ```bash
+   bash bootstrap.sh
+   ```
+
+   **Windows (PowerShell):**
+
+   ```powershell
+   # bootstrap.sh assumes Unix line endings and a bash shell. On
+   # Windows, run the manual setup instead:
+   python -m venv .venv
+   .venv\Scripts\Activate.ps1
+   pip install -e .
+   playwright install chromium
+   ```
+
+   Both paths produce the same result: virtualenv created, dependencies installed, Playwright Chromium browser installed. `bootstrap.sh` will additionally prompt for git author name + email on first run if they are not already configured for the repository.
 
 2. If bootstrap.sh fails, debug and fix. Common issues:
    - Python version: must be 3.11+

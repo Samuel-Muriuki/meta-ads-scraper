@@ -36,13 +36,30 @@ already-scraped ads de-duplicated.
 ```bash
 git clone https://github.com/Samuel-Muriuki/meta-ads-scraper.git
 cd meta-ads-scraper
-bash bootstrap.sh          # creates .venv, installs deps, installs Playwright chromium
+```
 
-# Activate the virtualenv
-source .venv/bin/activate  # macOS/Linux
-# OR
-.venv\Scripts\Activate.ps1 # Windows PowerShell
+**macOS / Linux:**
 
+```bash
+bash bootstrap.sh
+source .venv/bin/activate
+```
+
+**Windows (PowerShell):**
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e .
+playwright install chromium
+```
+
+Both produce the same result: virtualenv created, dependencies
+installed, Playwright Chromium installed. `bootstrap.sh` will prompt
+for your git author name + email on first run if they are not already
+configured for the repository.
+
+```bash
 # First run: keyword search, 10 ads, JSON to stdout
 python -m meta_ads_scraper search --keyword "running shoes" --max-results 10
 ```

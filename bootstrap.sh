@@ -27,11 +27,30 @@ if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" 
 fi
 echo -e "${GREEN}✓${NC} Python $PYTHON_VERSION"
 
-# ─── Step 2: Set git author ───────────────────────────────────────
-echo -e "${YELLOW}[2/9]${NC} Setting git author..."
-git config user.name "Samuel Muriuki"
-git config user.email "sammkimberly@gmail.com"
-echo -e "${GREEN}✓${NC} Git author set to Samuel Muriuki <sammkimberly@gmail.com>"
+# ─── Step 2: Set git author (interactive, skip if already configured) ──
+echo -e "${YELLOW}[2/9]${NC} Checking git author configuration..."
+
+CURRENT_NAME=$(git config user.name 2>/dev/null || echo "")
+CURRENT_EMAIL=$(git config user.email 2>/dev/null || echo "")
+
+if [ -z "$CURRENT_NAME" ] || [ -z "$CURRENT_EMAIL" ]; then
+    echo -e "${YELLOW}Git author identity not set for this repository.${NC}"
+    echo -e "${YELLOW}Please enter your git author details (these will be used for commits):${NC}"
+
+    read -p "Your name: " GIT_USER_NAME
+    read -p "Your email: " GIT_USER_EMAIL
+
+    if [ -z "$GIT_USER_NAME" ] || [ -z "$GIT_USER_EMAIL" ]; then
+        echo -e "${RED}Error: Both name and email are required.${NC}"
+        exit 1
+    fi
+
+    git config user.name "$GIT_USER_NAME"
+    git config user.email "$GIT_USER_EMAIL"
+    echo -e "${GREEN}✓${NC} Git author set to $GIT_USER_NAME <$GIT_USER_EMAIL>"
+else
+    echo -e "${GREEN}✓${NC} Git author already configured: $CURRENT_NAME <$CURRENT_EMAIL>"
+fi
 
 # ─── Step 3: Initialize git if needed ─────────────────────────────
 echo -e "${YELLOW}[3/9]${NC} Verifying git repository..."

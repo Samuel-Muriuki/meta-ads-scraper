@@ -55,6 +55,15 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ---
 
+### Post-release portability fixes (2026-05-12)
+
+#### Fixed
+- `bootstrap.sh` no longer hardcodes git author identity; prompts for name and email on first run if `git config user.name` / `user.email` are unset for the repository
+- Cross-platform line endings enforced via `.gitattributes` (Windows clones no longer fail `bash bootstrap.sh` due to CRLF on shell scripts)
+- README Quick start now documents a Windows-native PowerShell path so users without bash can install without `bootstrap.sh`
+
+---
+
 ## Phase Tags (added as phases complete)
 
 - `phase-0-bootstrap` — Initial scaffold

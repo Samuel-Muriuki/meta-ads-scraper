@@ -51,7 +51,17 @@ The first run takes ~30 seconds for a keyword search, ~60 seconds for a
 page-slug search (one extra navigation to resolve the slug to a
 page_id). Logs go to stderr; the JSON or CSV payload goes to stdout
 (or `--out file` if you'd rather skip the pipe). The `run-id` printed
-to stderr lets you resume the same scrape later.
+to stderr is a 32-character hex string (uuid4 with dashes stripped);
+it's the handle for `resume <run-id>` later.
+
+### Demo runs
+
+The `examples/` folder ships with real output from a controlled set
+of live runs against Meta's Ad Library — three vertical demos
+(jewelry, dental, automotive) plus a 500-ad sustained-load
+demonstration. Read `examples/README.md` for the exact commands,
+durations, and run-ids. Use those files to see what the schema looks
+like populated without spending your own rate-limit budget.
 
 ## Commands
 

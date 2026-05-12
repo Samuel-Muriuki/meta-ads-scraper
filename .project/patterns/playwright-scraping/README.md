@@ -24,13 +24,18 @@ Never use the sync API. Never mix.
 ## 2. Apply stealth before navigation
 
 ```python
-from playwright_stealth import stealth_async
+from playwright_stealth import Stealth
 
 page = await context.new_page()
-await stealth_async(page)
+await Stealth().apply_stealth_async(page)
 # ONLY THEN navigate
 await page.goto(url, wait_until="networkidle")
 ```
+
+Note: `playwright-stealth` 1.x exposed `stealth_async(page)` as a
+free function but imports `pkg_resources` and crashes on Python 3.13.
+We pin 2.x in `pyproject.toml` (`playwright-stealth>=2.0,<3.0`),
+which uses the class-based API above.
 
 ## 3. Prefer Locator API over query_selector
 

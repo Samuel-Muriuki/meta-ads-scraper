@@ -19,6 +19,7 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright_stealth import Stealth
 
 from ..checkpoint import CheckpointStore
+from ..constants import AD_CARD_SELECTOR
 from ..exceptions import PageResolutionError, ScraperBlockedError
 from ..models import Ad, SearchSpec
 from ..pagination import scroll_and_collect
@@ -50,7 +51,6 @@ _PAGE_ID_NAV_TIMEOUT = 30_000
 _DEFAULT_SCRAPE_TIMEOUT_S = 300
 _DEFAULT_RATE_LIMIT = 1.0
 _DEFAULT_CONCURRENCY = 1
-_AD_CARD_SELECTOR = r"text=/Library ID:\s*\d+/ >> xpath=ancestor::div[.//img][1]"
 
 
 class PlaywrightScraper(BaseScraper):
@@ -128,7 +128,7 @@ class PlaywrightScraper(BaseScraper):
 
         async for card in scroll_and_collect(
             page,
-            _AD_CARD_SELECTOR,
+            AD_CARD_SELECTOR,
             max_results=self._max_results,
             timeout_seconds=self._timeout_seconds,
             rate_limiter=self._rate_limiter,

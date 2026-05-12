@@ -9,6 +9,7 @@ from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import ValidationError
 
+from ..constants import AD_CARD_BOUNDARY_XPATH
 from ..models import Ad
 
 logger = structlog.get_logger()
@@ -46,7 +47,7 @@ async def iter_visible_ads(page: Page, source_url: str) -> AsyncIterator[Ad]:
     logger.info("ads_visible", count=count)
     for i in range(count):
         id_text = library_ids.nth(i)
-        card = id_text.locator("xpath=ancestor::div[.//img][1]")
+        card = id_text.locator(f"xpath={AD_CARD_BOUNDARY_XPATH}")
         ad = await parse_ad_card(card, source_url=source_url)
         if ad is not None:
             yield ad

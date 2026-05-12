@@ -18,6 +18,7 @@ from playwright.async_api import (
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright_stealth import Stealth
 
+from ..checkpoint import CheckpointStore
 from ..exceptions import PageResolutionError, ScraperBlockedError
 from ..models import Ad, SearchSpec
 from ..pagination import scroll_and_collect
@@ -61,6 +62,9 @@ class PlaywrightScraper(BaseScraper):
         timeout_seconds: int = _DEFAULT_SCRAPE_TIMEOUT_S,
         rate_limit: float = _DEFAULT_RATE_LIMIT,
         concurrency: int = _DEFAULT_CONCURRENCY,
+        checkpoint: CheckpointStore | None = None,
+        run_id: str | None = None,
+        yielded_ids: set[str] | None = None,
     ) -> None:
         if headless is None:
             headless = os.environ.get("PLAYWRIGHT_HEADLESS", "1") != "0"
@@ -71,6 +75,9 @@ class PlaywrightScraper(BaseScraper):
             requests_per_second=rate_limit,
             max_concurrency=concurrency,
         )
+        self._checkpoint = checkpoint
+        self._run_id = run_id
+        self._yielded_ids = yielded_ids
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
@@ -125,10 +132,18 @@ class PlaywrightScraper(BaseScraper):
             max_results=self._max_results,
             timeout_seconds=self._timeout_seconds,
             rate_limiter=self._rate_limiter,
+            yielded_ids=self._yielded_ids,
         ):
             ad = await parse_ad_card(card, source_url=url)
-            if ad is not None:
-                yield ad
+            if ad is None:
+                continue
+            # Checkpoint write is sync and fast (< 10ms on local SQLite).
+            # Inline keeps it ordered against the yield so the caller is
+            # guaranteed the ad is durably recorded before the exporter
+            # touches it.
+            if self._checkpoint is not None and self._run_id is not None:
+                self._checkpoint.record_ad(self._run_id, ad)
+            yield ad
 
     @retry_network
     async def _goto_with_retry(self, url: str) -> None:

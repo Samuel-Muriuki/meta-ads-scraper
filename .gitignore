@@ -80,6 +80,7 @@ playwright/.auth/
 auth-state.json
 *.har
 !tests/fixtures/*.har
+!tests/fixtures/har/*.har
 
 # Reconnaissance screenshots — reproducible from scripts/capture_html.py
 tests/fixtures/html/*.png

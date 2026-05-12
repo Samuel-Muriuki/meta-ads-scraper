@@ -63,15 +63,25 @@ def search(
         typer.Option("--out", help="Output file path. Defaults to stdout."),
     ] = None,
     max_results: Annotated[
+        int | None,
+        typer.Option(
+            "--max-results",
+            help="Cap on ads returned. Unset or 0 = unlimited (clamped to 1000 ceiling).",
+        ),
+    ] = None,
+    timeout_seconds: Annotated[
         int,
-        typer.Option("--max-results", help="Maximum ads returned."),
-    ] = 10,
+        typer.Option(
+            "--timeout",
+            help="Wall-clock budget for the scrape, in seconds.",
+        ),
+    ] = 300,
 ) -> None:
     _validate_inputs(keyword=keyword, page_url=page_url, page_slug=page_slug)
     exporter = _select_exporter(format_)
 
     spec = _build_spec(keyword=keyword, page_url=page_url, page_slug=page_slug)
-    ads = asyncio.run(_run_search(spec, max_results=max_results))
+    ads = asyncio.run(_run_search(spec, max_results=max_results, timeout_seconds=timeout_seconds))
 
     if out is not None:
         count = exporter(ads, out)
@@ -117,11 +127,13 @@ def _build_spec(*, keyword: str | None, page_url: str | None, page_slug: str | N
     return SearchSpec(mode="page_slug", query=page_slug)
 
 
-async def _run_search(spec: SearchSpec, max_results: int) -> list[Ad]:
+async def _run_search(
+    spec: SearchSpec, *, max_results: int | None, timeout_seconds: int
+) -> list[Ad]:
     ads: list[Ad] = []
-    async with PlaywrightScraper() as scraper:
+    async with PlaywrightScraper(
+        max_results=max_results, timeout_seconds=timeout_seconds
+    ) as scraper:
         async for ad in scraper.search(spec):
             ads.append(ad)
-            if len(ads) >= max_results:
-                break
     return ads

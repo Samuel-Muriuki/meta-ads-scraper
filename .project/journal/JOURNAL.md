@@ -6,18 +6,28 @@
 
 ## Current Phase
 
-**Phase 7 — APPROACH & Demo** (not yet started)
+**Submission preparation (post-Phase-7)** — final develop → main PR + v1.0.0 tag in flight; Loom recording out of scope.
 
-**Phase 6 merge commit:** `91926c7` — `Merge pull request #5 from Samuel-Muriuki/feat/phase-6-tests-ci-hardening`
-**Develop tip:** `91926c7` (will advance after this journal commit)
-**Main tip:** `9598b78` — Phase 0 closeout (unchanged; develop → main merge happens at submission)
-**Last completed phase:** Phase 6 — Tests & CI Hardening
-**Build path:** full BUILD-PLAN through Phase 7 (no scope cuts)
+**Phase 7 merge commit:** `53f0f4a` — `Merge pull request #6 from Samuel-Muriuki/feat/phase-7-approach-demo`
+**Develop tip:** `53f0f4a` (will advance after this journal commit)
+**Main tip:** `9598b78` — Phase 0 closeout (will advance when the develop → main release PR merges)
+**Last completed phase:** Phase 7 — APPROACH & Demo
+**Build path:** full BUILD-PLAN delivered; submission imminent
 **Submission deadline:** Monday 2026-05-13 9 PM Nairobi
 
 ---
 
 ## Recent Decisions
+
+### 2026-05-12 — Phase 7 closeout
+
+- **`.claude/` gitignore fix landed on develop directly, not on the Phase 7 branch.** A pre-flight audit (`.ai/claude-audit-2026-05-12.txt`) confirmed zero historical contamination; the directory was untracked locally but unprotected by `.gitignore`. The fix is a project-level hygiene chore, not Phase 7 work, so it went to `develop` as commit `8020990` and the Phase 7 branch was rebased onto it. Keeps the security fix bisectable on its own.
+- **APPROACH.md structured for cold-read.** Pulled the five engineering-decisions subsections directly from JOURNAL Recent Decisions rather than rewriting from scratch. 968 words — inside the 600–1000 target. An Antonio-curious enough to cross-reference the journal sees consistency; a reader who only opens APPROACH.md gets the same story.
+- **AI-assisted development surfaced honestly in APPROACH.md.** One neutral sentence in "Time + tools": "Used Claude Code in the loop for drafts and accelerated iteration; every line was reviewed and every architectural decision is recorded in `.project/journal/JOURNAL.md` and the per-phase Completion Reports." No spin, no hiding.
+- **Stress test re-captured to fix UTF-16 stderr.** The first 500-ad run's log was mangled (PowerShell's `2>` redirection produces UTF-16 LE with per-line `python :` wrappers). My analysis script then truncated that log to 0 bytes (genuine mistake). The re-run used `cmd /c "python ... 2> file"` with `PYTHONIOENCODING=utf-8` for clean UTF-8 capture. The re-run yielded 28 ads (vs 48 on the first attempt) because live ad inventory shifted between runs (~7-minute gap), not because of a scraper regression.
+- **Coverage gate stays at 78%** (Task 4 skipped). Local measurement 79.12% — short of the 80% lift threshold by 0.88 points. Per the Phase 7 prompt's explicit "no test gaming" rule, the gate stays where it is. Followup: lift to 80% post-submission by adding unit coverage on `playwright_scraper.py` (currently 33%).
+- **Stress test result framed honestly in README + CHANGELOG.** 28 ads from a 500-ad target looks like a failure number. The framing makes clear what the run does and does not prove: it proves sustained-operation survival + stall detector + rate-limiter; it does *not* prove the 1000-ad ceiling under load. The honest framing matters more than the headline number.
+- **`examples/stress_test_start.txt`** (a scratch echo file from the first attempt) was deliberately left untracked rather than deleted. Removing files mid-Phase-7 felt like reaching beyond mandate; the file is 51 bytes of timestamp text and disappears on the next clean clone.
 
 ### 2026-05-12 — Phase 6 closeout
 
@@ -153,6 +163,13 @@ All three pre-conditions shipped:
 - **`scripts/api_scraper.py` is referenced in `BaseScraper` docstrings as a future Path A.** No concrete plan to build it. Either delete the references when Path A is formally killed, or wire it up post-submission as a portfolio enhancement.
 - **`coverage.xml` is uploaded as a CI artifact** but not consumed anywhere. Hook up Codecov or a similar trending service when an account exists.
 
+### Phase 7 followups (logged 2026-05-12)
+
+- **Coverage gate stayed at 78% in Phase 7.** Local measurement 79.12%, below the 80% lift threshold. Adding unit tests just to game coverage was explicitly forbidden by the Phase 7 prompt. Followup: add genuine unit coverage on `playwright_scraper.py` (currently 33%) to earn the lift to 80%.
+- **Stress test could not reach the 1000-ad ceiling** because Meta's `shoes` keyword saturates around 28 unique visible cards in current state. A future stress run targeting a higher-inventory query (political ads + wide country set, or a stitched multi-keyword sweep) is needed to genuinely test the ceiling.
+- **`examples/stress_test.log` was re-captured** because the first attempt's UTF-16 mangling made event-parsing fragile. The fix (`cmd /c "... 2> file"` with `PYTHONIOENCODING=utf-8`) is documented in the log header. Future stress runs should use the same capture pattern.
+- **`.claude/` directory was forward-protected on develop** at commit `8020990`. Audit log preserved at `.ai/claude-audit-2026-05-12.txt` (gitignored). Audit confirms zero historical contamination; the patch is a hygiene fix not a leak response.
+
 ---
 
 ## Phase Completion Log
@@ -166,15 +183,16 @@ All three pre-conditions shipped:
 | 4 — Resilience | 2026-05-12 | merged at `ed74e1d` | [#3](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/3) | 9 atomic commits, retry + rate-limit + logging layer, no live smoke per Phase 4 directive. Mid-phase rebase to bake the rate-limiter concurrency-vs-queue-depth comment into the rate-limit commit (`891b286` → `705a46e`). |
 | 5 — CLI Polish & Resume | 2026-05-12 | merged at `6eb9e27` | [#4](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/4) | 10 atomic commits, checkpoint + resume + runs + progress bar + production README, two live runs to `examples/`. |
 | 6 — Tests & CI Hardening | 2026-05-12 | merged at `91926c7` | [#5](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/5) | 9 atomic commits, shared constants + typed exit codes + HAR replay + 78% coverage gate + mypy and doc cleanup. |
-| 7 — APPROACH & Demo | — | — | — | — |
+| 7 — APPROACH & Demo | 2026-05-12 | merged at `53f0f4a` | [#6](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/6) | 5 atomic commits, APPROACH.md (968 words) + 3 vertical demos + 500-ad sustained-load + final README polish + CHANGELOG. Pre-flight `.claude/` gitignore fix landed on develop directly at `8020990` before the PR opened. |
 
 ---
 
 ## Active Worktree State
 
-- Branch: `develop` after Phase 6 merge (`91926c7`)
-- Uncommitted edits: this Phase 6 closeout journal update
+- Branch: `develop` after Phase 7 merge (`53f0f4a`)
+- Uncommitted edits: this Phase 7 closeout journal update
 - Stash: (none)
+- Next action: develop → main PR + v1.0.0 tag, then Samuel records Loom + WhatsApps Antonio
 
 ---
 

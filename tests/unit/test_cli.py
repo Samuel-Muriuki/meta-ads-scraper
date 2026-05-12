@@ -6,10 +6,20 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+import typer
+from tenacity import RetryError
 from typer.testing import CliRunner
 
 from meta_ads_scraper.checkpoint import CheckpointStore
-from meta_ads_scraper.cli import app
+from meta_ads_scraper.cli import (
+    EXIT_BLOCKED,
+    EXIT_INTERRUPT,
+    EXIT_NETWORK,
+    EXIT_TIMEOUT,
+    _typed_exit_codes,
+    app,
+)
+from meta_ads_scraper.exceptions import ScraperBlockedError
 from meta_ads_scraper.models import Ad, SearchSpec
 
 runner = CliRunner()
@@ -216,3 +226,71 @@ class TestNoProgress:
             ["resume", "--no-progress", "missing-run-id"],
         )
         assert "no such option" not in _plain(result.output).lower()
+
+
+# -------------------------------------------------------------------------
+# Typed exit codes
+# -------------------------------------------------------------------------
+
+
+class TestTypedExitCodes:
+    """Each documented failure mode maps to the right exit code.
+
+    Tested at the decorator boundary so the assertions stay independent
+    of which command (search/resume/runs) raised. Per
+    ``docs/architecture/08-cli-design.md``.
+    """
+
+    def test_scraper_blocked_maps_to_3(self) -> None:
+        @_typed_exit_codes
+        def fn() -> None:
+            raise ScraperBlockedError("login wall")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            fn()
+        assert exc_info.value.exit_code == EXIT_BLOCKED == 3
+
+    def test_timeout_maps_to_4(self) -> None:
+        @_typed_exit_codes
+        def fn() -> None:
+            raise TimeoutError("budget exceeded")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            fn()
+        assert exc_info.value.exit_code == EXIT_TIMEOUT == 4
+
+    def test_retry_error_maps_to_5(self) -> None:
+        @_typed_exit_codes
+        def fn() -> None:
+            # tenacity.RetryError takes a "last_attempt" Future; we
+            # don't need a real one for the type-mapping test.
+            raise RetryError(last_attempt=None)  # type: ignore[arg-type]
+
+        with pytest.raises(typer.Exit) as exc_info:
+            fn()
+        assert exc_info.value.exit_code == EXIT_NETWORK == 5
+
+    def test_keyboard_interrupt_maps_to_130(self) -> None:
+        @_typed_exit_codes
+        def fn() -> None:
+            raise KeyboardInterrupt
+
+        with pytest.raises(typer.Exit) as exc_info:
+            fn()
+        assert exc_info.value.exit_code == EXIT_INTERRUPT == 130
+
+    def test_unhandled_exception_propagates(self) -> None:
+        @_typed_exit_codes
+        def fn() -> None:
+            raise ValueError("not in the map")
+
+        # Falls through to typer/Click's default handler -> exit 1.
+        with pytest.raises(ValueError, match="not in the map"):
+            fn()
+
+    def test_return_value_passes_through(self) -> None:
+        @_typed_exit_codes
+        def fn() -> int:
+            return 42
+
+        assert fn() == 42

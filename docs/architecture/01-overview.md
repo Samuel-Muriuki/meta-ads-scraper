@@ -43,15 +43,23 @@ CLI args
 pip install -e .
 playwright install chromium
 
-# Search by keyword
+# Search by keyword  (output lands at outputs/dental.csv)
 python -m meta_ads_scraper search --keyword "dental practices" --max-results 50 --format csv --out dental.csv
 
-# Search by page slug
+# Search by page slug (output lands at outputs/nike.json)
 python -m meta_ads_scraper search --page-slug "Nike" --format json --out nike.json
 
-# Resume a previous run
+# List recent runs (rich table to stderr)
+python -m meta_ads_scraper runs
+
+# Resume a previous run (new ads only; merge yourself if needed)
 python -m meta_ads_scraper resume <run-id>
 ```
+
+Bare-filename `--out` values are auto-prefixed with `outputs/`. Full
+paths (`--out /tmp/x.json`) pass through. The `outputs/` directory is
+gitignored except for `.gitkeep`. See the root README's Quick start
+for the platform-split bootstrap instructions.
 
 ## Related docs
 

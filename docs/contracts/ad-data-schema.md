@@ -69,7 +69,16 @@ class Ad(BaseModel):
 
 ### Why `frozen=True`
 
-Ads are scraped, validated, exported. We never mutate them after construction. Freezing catches accidental mutation in tests and gives us hashability (useful for dedup sets).
+Ads are scraped, validated, exported. We never mutate them after
+construction. Freezing catches accidental mutation in tests and
+documents the snapshot-shaped intent.
+
+Note: `frozen=True` only makes a model auto-hashable when every field
+is itself hashable. `Ad` carries list fields (`ad_creative_image_urls`,
+`platforms`, `languages`, `countries`) so it is **not** hashable in
+practice — use `ad.ad_library_id` as the dedup key in sets / dict
+keys (which is exactly what `scroll_and_collect` and
+`CheckpointStore` already do).
 
 ### Why `extra="forbid"`
 
@@ -119,11 +128,20 @@ class SearchSpec(BaseModel):
 
 ## Test fixtures
 
-`tests/fixtures/ads/` contains example JSON files for fixture-based testing:
+Model-level tests in `tests/unit/test_models.py` build `Ad`/`SearchSpec`
+instances inline rather than from disk fixtures — the constructors are
+the test surface.
 
-- `commercial_minimal.json` — only required fields populated
-- `commercial_full.json` — all commercial fields populated
-- `political_full.json` — includes demographic_breakdown and reach
-- `malformed.json` — for negative-path testing (should raise ValidationError)
+DOM-level parser tests use HTML and HAR fixtures:
 
-The Pydantic model is tested against each fixture in `tests/unit/test_models.py`.
+- `tests/fixtures/html/keyword_search_shoes.html` — slim HTML capture
+  consumed by `tests/integration/test_parser_offline.py` to verify the
+  parser extracts at least 5 ads cleanly.
+- `tests/fixtures/har/keyword_shoes_paginated.har` — slimmed HAR
+  fixture (cookies / auth scrubbed) consumed by
+  `tests/integration/test_pagination_har_replay.py` to exercise the
+  full scroll loop offline.
+
+JSON-level "golden" ad fixtures (`commercial_minimal.json` etc.) were
+considered during planning but never landed — the inline-constructor
+pattern proved sufficient for the model surface.

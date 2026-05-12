@@ -34,6 +34,13 @@ meta-ads-scraper runs [--limit N]
 | `--no-progress` | flag | off | Suppress the progress bar |
 | `-v`, `-vv` | count | 0 | `-v` = INFO, `-vv` = DEBUG with pretty console |
 
+`--out`: bare filenames (`shoes.json`) are auto-prefixed with
+`outputs/` and the directory is created on demand. Paths with any
+directory component (`./shoes.json`, `data/x.json`, `/tmp/x.json`)
+pass through unchanged. `outputs/` is gitignored except for
+`.gitkeep`. Resolution happens in `_resolve_output_path` in
+`cli.py`.
+
 ## `resume <run_id>` options
 
 `resume` rehydrates the original `SearchSpec` from the checkpoint and

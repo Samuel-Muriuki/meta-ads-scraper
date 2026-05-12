@@ -74,9 +74,17 @@ model_config = ConfigDict(frozen=True)
 ```
 
 Benefits:
-- Models are hashable (usable as dict keys, in sets)
 - Catches accidental mutation bugs at runtime
 - Documents intent: this is a snapshot, not a live object
+- Auto-hashable IFF every field is itself hashable
+
+Note on hashability: a frozen model with list / dict / set fields is
+**not** auto-hashable -- Pydantic's auto-`__hash__` requires every
+field to be hashable. The project's `Ad` model has list fields
+(`platforms`, `ad_creative_image_urls`, etc.), so `hash(ad)` raises
+`TypeError`. Use the natural-key field (`ad.ad_library_id`) as the
+dedup key in sets / dict keys, which is what `scroll_and_collect`
+and `CheckpointStore` do.
 
 ## Strict types where it matters
 
@@ -114,7 +122,20 @@ class SearchSpec(BaseModel):
         return self
 ```
 
-## Settings via pydantic-settings
+## Settings via pydantic-settings (not used today)
+
+The original planning brief reserved `pydantic-settings` as the
+configuration layer. The project never grew the surface to justify
+it -- configuration enters through two channels only:
+
+1. CLI flags (`--rate-limit`, `--concurrency`, `--max-results`,
+   `--timeout`, `-v`) parsed by Typer at the CLI boundary and passed
+   down as constructor kwargs.
+2. A small set of environment variables (`PLAYWRIGHT_HEADLESS`,
+   `META_LIVE_TESTS`) read at the relevant call site.
+
+If a future deployment needs `.env` files or layered precedence, the
+pattern below is the path. For now this is documented for completeness.
 
 ```python
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -128,12 +149,12 @@ class Settings(BaseSettings):
 
     rate_limit: float = 1.0
     concurrency: int = 1
-    default_max_results: Optional[int] = None
+    default_max_results: int | None = None
     default_timeout: int = 300
-
-# Usage
-settings = Settings()  # reads .env + env vars
 ```
+
+See `docs/architecture/02-architecture.md` -> "Configuration" for
+the design rationale.
 
 ## Why we use Pydantic for this project
 

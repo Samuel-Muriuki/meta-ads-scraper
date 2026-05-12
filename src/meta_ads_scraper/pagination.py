@@ -9,6 +9,7 @@ import structlog
 from playwright.async_api import Locator, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+from .rate_limit import RateLimiter
 from .retry import retry_dom
 
 logger = structlog.get_logger()
@@ -29,7 +30,16 @@ async def scroll_and_collect(
     timeout_seconds: int = 300,
     stall_threshold: int = 3,
     yielded_ids: Iterable[str] | None = None,
+    rate_limiter: RateLimiter | None = None,
 ) -> AsyncIterator[Locator]:
+    """Yield ad-card locators across Meta's infinite-scroll DOM.
+
+    The optional ``rate_limiter`` gates the **top** of every iteration of
+    the scroll loop, so each tick of card collection + scroll + idle-wait
+    obeys the configured requests-per-second + concurrency caps. Default
+    ``None`` preserves the pre-Phase-4 behaviour and keeps the existing
+    unit tests free of timing dependencies.
+    """
     effective_max = _normalize_max_results(max_results)
     yielded: set[str] = set(yielded_ids) if yielded_ids else set()
     stall_count = 0
@@ -37,6 +47,9 @@ async def scroll_and_collect(
 
     try:
         while True:
+            if rate_limiter is not None:
+                await rate_limiter.acquire()
+
             if time.monotonic() - start > timeout_seconds:
                 logger.info(
                     "pagination_timeout",

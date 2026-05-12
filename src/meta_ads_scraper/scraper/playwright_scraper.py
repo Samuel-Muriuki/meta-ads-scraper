@@ -22,6 +22,7 @@ from ..exceptions import PageResolutionError, ScraperBlockedError
 from ..models import Ad, SearchSpec
 from ..pagination import scroll_and_collect
 from ..parsers.ad_card import parse_ad_card
+from ..rate_limit import RateLimiter
 from ..retry import retry_dom, retry_network
 from ..url_resolver import PAGE_ID_PATTERNS, resolve_url
 from .base import BaseScraper
@@ -46,6 +47,8 @@ _COOKIE_TIMEOUT = 3_000
 _LOGIN_PROBE_TIMEOUT = 1_000
 _PAGE_ID_NAV_TIMEOUT = 30_000
 _DEFAULT_SCRAPE_TIMEOUT_S = 300
+_DEFAULT_RATE_LIMIT = 1.0
+_DEFAULT_CONCURRENCY = 1
 _AD_CARD_SELECTOR = r"text=/Library ID:\s*\d+/ >> xpath=ancestor::div[.//img][1]"
 
 
@@ -56,12 +59,18 @@ class PlaywrightScraper(BaseScraper):
         headless: bool | None = None,
         max_results: int | None = None,
         timeout_seconds: int = _DEFAULT_SCRAPE_TIMEOUT_S,
+        rate_limit: float = _DEFAULT_RATE_LIMIT,
+        concurrency: int = _DEFAULT_CONCURRENCY,
     ) -> None:
         if headless is None:
             headless = os.environ.get("PLAYWRIGHT_HEADLESS", "1") != "0"
         self._headless = headless
         self._max_results = max_results
         self._timeout_seconds = timeout_seconds
+        self._rate_limiter = RateLimiter(
+            requests_per_second=rate_limit,
+            max_concurrency=concurrency,
+        )
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
@@ -115,6 +124,7 @@ class PlaywrightScraper(BaseScraper):
             _AD_CARD_SELECTOR,
             max_results=self._max_results,
             timeout_seconds=self._timeout_seconds,
+            rate_limiter=self._rate_limiter,
         ):
             ad = await parse_ad_card(card, source_url=url)
             if ad is not None:

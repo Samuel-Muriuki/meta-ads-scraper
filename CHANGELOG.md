@@ -57,10 +57,17 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Post-release portability fixes (2026-05-12)
 
+#### Added
+- `outputs/` folder convention — bare filename `--out` values now default to `outputs/<filename>` instead of writing to the repo root. Full paths (`--out /tmp/x.json` or `--out data/x.json`) still pass through unchanged. The `outputs/` directory is gitignored except for `.gitkeep` so the convention is reproducible on a fresh clone.
+- `.gitattributes` at the repo root for cross-platform line-ending consistency (`*.sh`, `*.py`, `*.toml`, `*.yml`, `*.md` forced to LF; HAR / image / PDF marked binary).
+
 #### Fixed
-- `bootstrap.sh` no longer hardcodes git author identity; prompts for name and email on first run if `git config user.name` / `user.email` are unset for the repository
-- Cross-platform line endings enforced via `.gitattributes` (Windows clones no longer fail `bash bootstrap.sh` due to CRLF on shell scripts)
-- README Quick start now documents a Windows-native PowerShell path so users without bash can install without `bootstrap.sh`
+- `bootstrap.sh` no longer hardcodes git author identity; prompts for name and email on first run if `git config user.name` / `user.email` are unset for the repository.
+- Cross-platform line endings enforced via `.gitattributes` (Windows clones no longer fail `bash bootstrap.sh` due to CRLF on shell scripts).
+- README Quick start has explicit macOS/Linux and Windows PowerShell subsections plus a new "First run" anchor that documents the `outputs/` convention.
+- README Architecture tree updated to include `constants.py` (Phase 6 shared-selector module) and tightened comments on `exceptions.py` and `retry.py`.
+- Configuration table has a new "Output folder" row documenting the bare-filename → `outputs/` behaviour.
+- `jq` references in README now flag it as a system tool (not a Python dep) and include a Python one-liner alternative for users without it. New "Optional system tools" subsection lists install hints (`brew install jq` / `apt install jq` / `choco install jq`).
 
 ---
 

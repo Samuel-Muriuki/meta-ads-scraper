@@ -25,7 +25,7 @@ classifiers = [
 
 dependencies = [
     "playwright>=1.45,<2.0",
-    "playwright-stealth>=1.0,<2.0",
+    "playwright-stealth>=2.0,<3.0",
     "pydantic>=2.7,<3.0",
     "pydantic-settings>=2.3,<3.0",
     "httpx>=0.27,<1.0",
@@ -103,8 +103,11 @@ warn_return_any = true
 no_implicit_reexport = true
 strict_equality = true
 
+# playwright and tenacity ship `py.typed`, so their stubs work without an
+# override. playwright-stealth does NOT ship `py.typed`, so we keep the
+# override scoped narrowly to that one module.
 [[tool.mypy.overrides]]
-module = ["playwright.*", "playwright_stealth.*", "tenacity.*"]
+module = ["playwright_stealth.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -126,8 +129,14 @@ addopts = [
 [tool.coverage.run]
 branch = true
 source = ["src/meta_ads_scraper"]
+omit = [
+    "src/meta_ads_scraper/__main__.py",
+]
 
 [tool.coverage.report]
+fail_under = 78
+show_missing = true
+skip_covered = false
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",

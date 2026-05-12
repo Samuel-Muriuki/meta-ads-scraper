@@ -6,19 +6,25 @@
 
 ## Current Phase
 
-**Phase 2 — Three Search Paths + Exporters** (in review)
+**Phase 3 — Pagination** (in review)
 
-**Feature branch:** `feat/phase-2-three-paths` — open PR [#3](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/3)
-**Develop tip:** `307a3d8` — `Merge pull request #2 from Samuel-Muriuki/feat/phase-1-mvp-keyword` (Phase 1 boundary)
-**Main tip:** `3abfb3d` — `Merge pull request #1 from Samuel-Muriuki/develop` (Phase 0 boundary)
-**Last commit on feat branch:** `f5d1afb` — `🐛 fix(tests): strip ANSI escapes in CLI tests; reformat scripts`
-**CI status (PR #3):** ✅ green — https://github.com/Samuel-Muriuki/meta-ads-scraper/actions/runs/25678576378
-**Open PRs:** [#3 — Phase 2: Three search paths + exporters](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/3)
+**Feature branch:** `feat/phase-3-pagination` (PR opening on push)
+**Develop tip:** `7f14020` — `Merge pull request #1 from Samuel-Muriuki/feat/phase-2-three-paths` (Phase 2 boundary)
+**Main tip:** `9598b78` — Phase 0 closeout
+**Last commit on feat branch:** `20efa85` — `🧪 test: extend smoke test to verify pagination yields multi-page results`
 **Build path:** full BUILD-PLAN through Phase 7 (no scope cuts)
 
 ---
 
 ## Recent Decisions
+
+### 2026-05-12 — Phase 3 in review
+
+- **scroll_and_collect lives as a leaf module** (`src/meta_ads_scraper/pagination.py`). No deps on `scraper/*` or `cli`. Driven by the scraper, consumed via `async for card in scroll_and_collect(...)`. 15 unit tests cover max_results / stall / dedup / timeout / container-fallback / edge cases against a `_FakePage` mock.
+- **MAX_RESULTS_CEILING = 1000.** `--max-results=0` and `--max-results=None` both map to the ceiling. `--max-results > 1000` logs a warning and clamps. The 1000 figure matches `docs/architecture/06-pagination.md`.
+- **Card selector switched mid-phase from xpath-only to chained text→xpath.** The xpath `//div[Library-ID-descendant and img-descendant and no-inner-Library-ID-div]` returned zero matches on the live Meta DOM. Replaced with `text=/Library ID:\s*\d+/ >> xpath=ancestor::div[.//img][1]` — same two-step pattern that powers `iter_visible_ads` and the offline parser test. Live smoke recovered from 0 ads to 20+.
+- **Pagination smoke proves end-to-end.** `tests/integration/test_playwright_scraper_mvp.py[keyword=shoes-paginated]` with `max_results=30` returns 20+ ads in ~207s against real Meta. Elapsed-time assertion (>15s) catches "scroll didn't trigger" failure mode.
+- **Graceful shutdown.** `scroll_and_collect` catches `asyncio.CancelledError`, logs `shutdown_requested` with the yielded count, then re-raises so the caller's exporter can still flush partial output.
 
 ### 2026-05-11 — Phase 2 in review
 
@@ -86,8 +92,8 @@ All three pre-conditions shipped:
 |---|---|---|---|---|
 | 0 — Bootstrap | 2026-05-11 | 2026-05-11T09:48Z | [#1](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/1) | Coverage gate deferred to Phase 6; two smoke tests cleared pytest exit-5 on empty scaffold; funding/sponsor surface added per template §4.3. Merged develop→main via `--merge` strategy at main SHA `3abfb3d`. |
 | 1 — MVP Keyword | 2026-05-11 | 2026-05-11T11:53Z | [#2](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/2) | 11 atomic commits. Live keyword smoke 0 ads (Swahili locale). HTML fixture captured for Phase 2 reconnaissance. Merged to develop. |
-| 2 — Three Search Paths | 2026-05-11 | (in review) | [#3](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/3) | 10 atomic commits. All 3 pre-conditions + 5 feature + 1 mid-phase refactor (httpx → Playwright nav) + 1 CI fix. All 3 live modes pass end-to-end. PR CI green. |
-| 3 — Pagination | — | — | — | — |
+| 2 — Three Search Paths | 2026-05-11 | 2026-05-11T21:24Z | (closed-and-replaced after history rewrite; merged on fresh repo) | 10 atomic commits, three pre-conditions + feature + mid-phase httpx→Playwright refactor. Live verified across all 3 modes. |
+| 3 — Pagination | 2026-05-12 | (in review) | (PR opening on push) | 6 atomic commits: pagination module + 15 unit tests + scraper integration + CLI flags + live smoke for multi-page + mid-phase selector fix. |
 | 4 — Resilience | — | — | — | — |
 | 5 — CLI Polish & Resume | — | — | — | — |
 | 6 — Tests & CI | — | — | — | — |
@@ -97,8 +103,8 @@ All three pre-conditions shipped:
 
 ## Active Worktree State
 
-- Branch: `feat/phase-2-three-paths`
-- Uncommitted edits: documentation reorganization (this commit)
+- Branch: `feat/phase-3-pagination`
+- Uncommitted edits: this journal update
 - Stash: (none)
 
 ---

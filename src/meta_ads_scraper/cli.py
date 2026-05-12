@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import sys
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Annotated, TextIO
+from typing import Annotated, ParamSpec, TextIO, TypeVar
 
 import structlog
 import typer
@@ -17,8 +18,10 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 from rich.table import Table
+from tenacity import RetryError
 
 from .checkpoint import CheckpointStore, RunSummary
+from .exceptions import ScraperBlockedError
 from .exporters import write_ads_csv, write_ads_json
 from .logging_config import configure_logging
 from .models import Ad, SearchSpec
@@ -29,6 +32,47 @@ logger = structlog.get_logger()
 
 _MIN_RATE_LIMIT = 0.1
 _MAX_RATE_LIMIT = 10.0
+
+# Documented exit codes (see docs/architecture/08-cli-design.md).
+EXIT_OK = 0
+EXIT_GENERIC = 1
+EXIT_BAD_ARGS = 2  # Typer / Click sets this on parameter errors.
+EXIT_BLOCKED = 3
+EXIT_TIMEOUT = 4
+EXIT_NETWORK = 5
+EXIT_INTERRUPT = 130
+
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _typed_exit_codes(func: Callable[_P, _R]) -> Callable[_P, _R]:
+    """Map known scraper failure modes to documented CLI exit codes.
+
+    Anything not listed here falls through to typer/Click's default
+    handler: ``typer.BadParameter`` -> 2, uncaught exceptions -> 1.
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        try:
+            return func(*args, **kwargs)
+        except KeyboardInterrupt as exc:
+            typer.echo("interrupted by user", err=True)
+            raise typer.Exit(EXIT_INTERRUPT) from exc
+        except ScraperBlockedError as exc:
+            typer.echo(f"blocked by upstream: {exc}", err=True)
+            raise typer.Exit(EXIT_BLOCKED) from exc
+        except TimeoutError as exc:
+            typer.echo(f"timeout exceeded: {exc}", err=True)
+            raise typer.Exit(EXIT_TIMEOUT) from exc
+        except RetryError as exc:
+            typer.echo(f"network failure after retries exhausted: {exc}", err=True)
+            raise typer.Exit(EXIT_NETWORK) from exc
+
+    return wrapper
+
 
 _Exporter = Callable[[Iterable[Ad], "Path | TextIO"], int]
 _EXPORTERS: dict[str, _Exporter] = {
@@ -54,6 +98,7 @@ def _main() -> None:
 
 
 @app.command()
+@_typed_exit_codes
 def search(
     keyword: Annotated[
         str | None,
@@ -168,6 +213,7 @@ def search(
 
 
 @app.command()
+@_typed_exit_codes
 def resume(
     run_id: Annotated[str, typer.Argument(help="The run_id printed by `search`.")],
     format_: Annotated[
@@ -269,6 +315,7 @@ def resume(
 
 
 @app.command()
+@_typed_exit_codes
 def runs(
     limit: Annotated[
         int,

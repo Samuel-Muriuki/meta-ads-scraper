@@ -57,11 +57,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      # Fast-feedback unit-only run; coverage gate is enforced in the
+      # integration-replay job (which has the full code surface visible).
       - name: Run unit tests
-        run: pytest tests/unit/ -v
+        run: pytest tests/unit/ -v --cov-fail-under=0
 
   integration-replay:
-    name: Integration (HAR Replay)
+    name: Integration (HAR Replay) + Coverage Gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -85,8 +87,20 @@ jobs:
           pip install -e ".[dev]"
           playwright install chromium --with-deps
 
-      - name: Run replay integration tests
-        run: pytest tests/integration/ -v -m "not live_test"
+      # Runs the full non-live suite (unit + integration) with coverage
+      # so the gate has the complete code surface to measure against.
+      # `fail_under = 78` lives in pyproject.toml [tool.coverage.report];
+      # any drop below that floor fails this job.
+      - name: Run tests with coverage gate
+        run: pytest -m "not live_test" -v --cov --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          retention-days: 14
 
   live-smoke:
     name: Live Smoke (Manual Only)

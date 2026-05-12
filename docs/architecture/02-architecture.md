@@ -6,7 +6,7 @@
 src/meta_ads_scraper/
 ├── __main__.py              # entrypoint: python -m meta_ads_scraper
 ├── cli.py                   # Typer app, argument parsing, dispatches to scraper
-├── config.py                # pydantic-settings: env vars, defaults
+├── constants.py             # AD_CARD_SELECTOR / AD_CARD_BOUNDARY_XPATH
 ├── exceptions.py            # Custom exception hierarchy
 ├── logging_config.py        # structlog setup
 ├── models.py                # Ad, SearchSpec
@@ -17,14 +17,19 @@ src/meta_ads_scraper/
 ├── pagination.py            # scroll_and_collect generator
 ├── scraper/
 │   ├── base.py              # abstract BaseScraper
-│   ├── playwright_scraper.py # Path B impl (primary)
-│   └── api_scraper.py       # Path A impl (stub, future)
+│   └── playwright_scraper.py # Path B impl (primary)
 ├── parsers/
 │   └── ad_card.py           # DOM locator → Ad
 └── exporters/
     ├── csv_exporter.py
     └── json_exporter.py
 ```
+
+`scraper/api_scraper.py` (Path A — the official Meta Ad Library API)
+is **not** implemented today. Path A is post-MVP, gated on Meta
+developer-account approval; the abstract `scraper/base.py` exists
+specifically so the implementation can land later without touching
+the CLI or downstream code.
 
 ## Dependency Direction (strict)
 
@@ -47,10 +52,10 @@ cli.py
   ├─ url_resolver
   │    ↓ depends on
   │    └─ models
-  └─ logging_config, config, exceptions (used everywhere)
+  └─ logging_config, constants, exceptions (used everywhere)
 ```
 
-**Rule:** parsers, pagination, retry, rate_limit, models, exporters MUST NOT depend on `scraper/*` or `cli.py`. Keep the leaf modules dependency-free so they're testable in isolation.
+**Rule:** parsers, pagination, retry, rate_limit, models, exporters MUST NOT depend on `scraper/*` or `cli.py`. Keep the leaf modules dependency-free so they're testable in isolation. `constants.py` is the only module the parser and scraper both import from.
 
 ## Why `scraper/base.py` is abstract
 
@@ -87,16 +92,22 @@ The CLI uses `async with build_scraper(config) as scraper:` and never knows whic
 9. CLI exits with appropriate code
 ```
 
-## Configuration Layers
+## Configuration
 
-In order of precedence (highest wins):
+Two channels only:
 
-1. **CLI flags** — `--max-results 100`
-2. **Environment variables** — `META_ADS_MAX_RESULTS=100`
-3. **`.env` file** — same vars, loaded by pydantic-settings
-4. **Hardcoded defaults** — defined in `config.py`
+1. **CLI flags** — `--max-results 100`, `--rate-limit 0.5`, etc.
+   Parsed by Typer at the CLI boundary and passed down as
+   constructor kwargs.
+2. **Environment variables** — `PLAYWRIGHT_HEADLESS` (read by
+   `PlaywrightScraper.__init__`) and `META_LIVE_TESTS` (read by
+   pytest gating). Read at the relevant call site, not via a
+   central settings object.
 
-Use `pydantic-settings` `BaseSettings` to wire all four together.
+No `.env` parsing, no `pydantic-settings`, no layered precedence.
+The simpler model fits the project's single-machine deployment
+posture (`docs/architecture/11-deployment-and-running.md`); revisit
+if a richer configuration story ever becomes necessary.
 
 ## What's NOT in the architecture (and why)
 

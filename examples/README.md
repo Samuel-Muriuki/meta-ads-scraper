@@ -40,9 +40,28 @@ python -m meta_ads_scraper search --keyword "luxury cars" \
 
 ## Sustained-load demonstration
 
-`stress_test_500ads.json` + `stress_test.log` (Phase 7 Task 3) exercise
-the rate limiter and retry layer over a longer scrape. See those files
-for the full run record.
+`stress_test_500ads.json` + `stress_test.log` (Phase 7 Task 3)
+exercise the scraper's stop-condition handling and rate-limiter
+behaviour over a longer run.
+
+| Field | Value |
+|---|---|
+| Command | `search --keyword shoes --max-results 500 --rate-limit 1.0 --timeout 600 -v` |
+| Duration | 10 min 59 s |
+| Ads delivered | 28 |
+| Stop condition | `pagination_stalled` (3 consecutive no-progress scrolls) |
+| Retries fired | 0 |
+| Run-id | `ad5ea79504e34c64b903f5fb974c279a` |
+
+The 500-ad cap was not reached — the `shoes` keyword saturates
+around 28 unique cards in current Meta state, so the
+`pagination_stalled` stop condition fired well before
+`max_results`. The 1000-ad ceiling on the scraper itself remains
+untested under sustained load; reaching it would need a
+higher-inventory query (or stitching multiple keyword sweeps).
+What this run *does* prove: the scraper survives 11 minutes of
+sustained operation, the rate limiter holds, and the stall
+detector terminates cleanly without aborting the run.
 
 ## Known cosmetic issue
 

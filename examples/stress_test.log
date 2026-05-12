@@ -1,0 +1,33 @@
+# Phase 7 Task 3 -- sustained-load demonstration
+# Command:  python -m meta_ads_scraper search --keyword shoes
+#           --max-results 500 --rate-limit 1.0 --timeout 600
+#           --format json --out examples/stress_test_500ads.json
+#           --no-progress -v
+# Start UTC: 2026-05-12T14:18:42.910510Z (scrape_start)
+# End UTC:   2026-05-12T14:29:42.244865Z (run_completed)
+# Duration:  10 min 59 s
+# Run ID:    ad5ea79504e34c64b903f5fb974c279a
+# Ads:       28 (pagination_stalled at 14:28:09Z after 3 consecutive
+#            no-progress scrolls -- shoes keyword exhausted its visible
+#            fresh-ad tail well before 500)
+# Retries:   0 (no retry_attempted events at -v / INFO)
+# Rate-limit warnings: 0
+# Notes:     Demonstrates pagination_stalled stop condition firing as
+#            designed; rate limiter held cleanly across the full 11
+#            minutes; retry layer was not exercised because the run
+#            saw no transient failures. The 1000-ad ceiling remains
+#            untested -- the shoes keyword saturates around 28 unique
+#            cards in current Meta state. A higher-inventory query
+#            (e.g. country-wide political ads) would be needed to
+#            reach the ceiling in a future stress run.
+#
+# Raw structlog JSON below.
+# ----------------------------------------------------------------------
+
+{"run_id": "ad5ea79504e34c64b903f5fb974c279a", "mode": "keyword", "query": "shoes", "event": "run_started", "level": "info", "timestamp": "2026-05-12T14:18:10.008710Z"}
+run-id: ad5ea79504e34c64b903f5fb974c279a
+{"url": "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&q=shoes&search_type=keyword_unordered&locale=en_US", "mode": "keyword", "query": "shoes", "event": "scrape_start", "level": "info", "timestamp": "2026-05-12T14:18:42.910510Z"}
+{"yielded": 28, "stall_count": 3, "event": "pagination_stalled", "level": "info", "timestamp": "2026-05-12T14:28:09.950432Z"}
+
+{"run_id": "ad5ea79504e34c64b903f5fb974c279a", "event": "run_completed", "level": "info", "timestamp": "2026-05-12T14:29:42.244865Z"}
+wrote 28 ad(s) to examples\stress_test_500ads.json

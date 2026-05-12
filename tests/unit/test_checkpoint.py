@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
@@ -43,7 +44,9 @@ def _spec(query: str = "shoes") -> SearchSpec:
 class TestConstruction:
     def test_schema_created(self, store: CheckpointStore) -> None:
         # Two tables exist after construction.
-        with sqlite3.connect(store.db_path) as conn:
+        # closing() actually .close()s the connection on exit; the bare
+        # `with sqlite3.connect()` form only manages transactions.
+        with closing(sqlite3.connect(store.db_path)) as conn:
             tables = {
                 row[0]
                 for row in conn.execute(

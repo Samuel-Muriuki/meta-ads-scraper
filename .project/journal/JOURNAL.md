@@ -6,18 +6,29 @@
 
 ## Current Phase
 
-**Phase 5 — CLI Polish & Resume** (in progress)
+**Phase 6 — Tests & CI Hardening** (not yet started)
 
-**Phase 4 merge commit:** `ed74e1d` — `Merge pull request #3 from Samuel-Muriuki/feat/phase-4-resilience`
-**Develop tip:** `ed74e1d` (will advance after this journal commit)
+**Phase 5 merge commit:** `6eb9e27` — `Merge pull request #4 from Samuel-Muriuki/feat/phase-5-cli-polish-resume`
+**Develop tip:** `6eb9e27` (will advance after this journal commit)
 **Main tip:** `9598b78` — Phase 0 closeout (unchanged; develop → main merge happens at submission)
-**Last completed phase:** Phase 4 — Resilience
+**Last completed phase:** Phase 5 — CLI Polish & Resume
 **Build path:** full BUILD-PLAN through Phase 7 (no scope cuts)
 **Submission deadline:** Monday 2026-05-13 9 PM Nairobi
 
 ---
 
 ## Recent Decisions
+
+### 2026-05-12 — Phase 5 closeout
+
+- **Checkpoint ownership split between scraper and CLI.** The scraper calls `record_ad` inline as it yields; the CLI owns `start_run` / `complete_run` / `abort_run` around `asyncio.run`. Async generators do not give the inside-function a clean signal of "consumer finished normally vs aborted by exception", so terminal-status writes belong to the caller. Documented in commit `93ab9b4`'s body.
+- **Inline (synchronous) `record_ad` from inside an async loop.** SQLite writes are sub-10ms on local disk; an `asyncio.to_thread` hop per ad would cost more than it gains. The Phase 5 prompt stop condition (`>100ms per ad`) was monitored during the live runs and stayed clear.
+- **Resume writes new ads only; combined output is the caller's problem.** Alternative would have been to refetch + write the full set, which requires storing the entire `Ad` object (not just `ad_library_id`) in the checkpoint — a much larger schema. Trade-off documented prominently in `resume --out` help text and the README's "Resume from interruption" section.
+- **`search` always checkpoints.** No opt-out flag. Every search creates a row in `data/runs.sqlite`. The DB is gitignored and small (~1 KB per run row + scraped_ads); users can `rm data/runs.sqlite` to wipe. `--db-path` is a one-liner if needed in Phase 6+.
+- **Progress bar uses `Progress(disable=...)` instead of branching code paths.** Single scrape code path differentiated only by the `disable` flag, computed from `(not show_progress) or (not console.is_terminal)`. Rich's documented way to make the entire context a silent no-op.
+- **`runs` table renders via `Console(stderr=True)`.** Same stderr discipline as the rest of the CLI: stdout reserved for JSON/CSV payloads, stderr for diagnostics. Architectural test only — Click 8.2 removed `mix_stderr=False`, so behavioural tests on stdout/stderr separation are deferred to Phase 6 subprocess-based coverage.
+- **`RunSummary` is a frozen dataclass, not a Pydantic model.** It's a read-only projection of the `runs` row plus a denormalised `ad_count`. No validation needed, no cross-module serialisation — a dataclass is the lighter fit.
+- **Phase 4's deferred live smoke ran here as Task 6.** One keyword search + one page-slug scrape, 10 ads each, at 0.5 req/sec. Both committed as `examples/keyword_shoes.json` and `examples/page_slug_nike.csv`. DOM unchanged from Phase 3; the chained card selector and the `delegate_page` page-id pattern both still work.
 
 ### 2026-05-12 — Phase 4 closeout
 
@@ -115,6 +126,14 @@ All three pre-conditions shipped:
 - **`tenacity.*` mypy override is now live** — Phase 4 imports tenacity in production code. The earlier "currently unused" followup is cleared.
 - **Pre-existing followup remains:** `playwright_stealth.*` mypy override generates an "unused section" note (informational, not blocking). Sweep at Phase 6 along with the other mypy housekeeping.
 
+### Phase 5 followups (logged 2026-05-12)
+
+- **Resume produces "new ads only" output.** The resume command does not rewrite the original `--out` file; merging the two output files is the caller's job. Document in `APPROACH.md` or add a `--merge-with` flag in Phase 6+ if usability feedback requests it.
+- **Checkpoint DB path is not CLI-configurable.** Defaults to `data/runs.sqlite`. Add `--db-path` if Phase 6+ tests need to point at a per-test sandbox, or if a Hoski deployment needs the DB on a different filesystem.
+- **`docs/architecture/08-cli-design.md` is stale.** It documents the planned exit-code table (0/1/2/3/4/5/130) which is aspirational — we haven't wired typed exit codes for `ScraperBlockedError` / timeout / network failures yet. Reconcile during Phase 6.
+- **`docs/architecture/02-architecture.md` lists `config.py`** in the module map; we never created that module. Either delete the reference or actually add pydantic-settings in Phase 6.
+- **`Click 8.2` removed `mix_stderr=False`** on `CliRunner`, so the test suite can no longer assert "X went to stderr only". The runs-to-stderr discipline is enforced architecturally via `Console(stderr=True)`. If Phase 6 wants behavioural coverage, switch to subprocess-based tests for the few stderr/stdout split assertions.
+
 ---
 
 ## Phase Completion Log
@@ -126,7 +145,7 @@ All three pre-conditions shipped:
 | 2 — Three Search Paths | 2026-05-11 | 2026-05-11T21:24Z | (closed-and-replaced after history rewrite; merged on fresh repo) | 10 atomic commits, three pre-conditions + feature + mid-phase httpx→Playwright refactor. Live verified across all 3 modes. |
 | 3 — Pagination | 2026-05-12 | 2026-05-12T04:45Z | [#2](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/2) | 7 atomic commits. Pagination module + 15 unit tests + scraper integration + CLI flags + live smoke for multi-page + mid-phase selector fix. Merged at develop SHA `d7b28b9`. |
 | 4 — Resilience | 2026-05-12 | merged at `ed74e1d` | [#3](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/3) | 9 atomic commits, retry + rate-limit + logging layer, no live smoke per Phase 4 directive. Mid-phase rebase to bake the rate-limiter concurrency-vs-queue-depth comment into the rate-limit commit (`891b286` → `705a46e`). |
-| 5 — CLI Polish & Resume | 2026-05-12 (started) | — | — | In progress. SQLite checkpoint + resume subcommand, rich progress bar, production README, examples folder. |
+| 5 — CLI Polish & Resume | 2026-05-12 | merged at `6eb9e27` | [#4](https://github.com/Samuel-Muriuki/meta-ads-scraper/pull/4) | 10 atomic commits, checkpoint + resume + runs + progress bar + production README, two live runs to `examples/`. |
 | 6 — Tests & CI | — | — | — | — |
 | 7 — APPROACH & Demo | — | — | — | — |
 
@@ -134,8 +153,8 @@ All three pre-conditions shipped:
 
 ## Active Worktree State
 
-- Branch: `develop` after Phase 4 merge (`ed74e1d`)
-- Uncommitted edits: this Phase 4 closeout journal update
+- Branch: `develop` after Phase 5 merge (`6eb9e27`)
+- Uncommitted edits: this Phase 5 closeout journal update
 - Stash: (none)
 
 ---

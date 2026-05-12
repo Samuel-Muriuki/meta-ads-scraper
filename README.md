@@ -125,17 +125,32 @@ Status, and Ads.
 ### Worked examples
 
 ```bash
-# Keyword search, write CSV
+# Keyword search, write CSV (lands at outputs/dental.csv)
 python -m meta_ads_scraper search --keyword "dental practices" \
     --max-results 50 --format csv --out dental.csv
 
-# Page slug, JSON to a file
+# Page slug, JSON to a file (lands at outputs/nike.json)
 python -m meta_ads_scraper search --page-slug Nike --format json \
     --out nike.json
+```
 
+`jq` is a popular JSON-processing tool installed separately via your
+system package manager (`brew install jq` on macOS, `sudo apt install
+jq` on Ubuntu/Debian, `choco install jq` on Windows, or download from
+<https://stedolan.github.io/jq/>). If it is installed, you can pipe
+the scraper's JSON output straight into it:
+
+```bash
 # Page URL, stream JSON through jq
 python -m meta_ads_scraper search \
     --page-url https://www.facebook.com/Nike | jq '.[].ad_library_id'
+```
+
+If `jq` is not installed, a Python one-liner does the same job:
+
+```bash
+python -m meta_ads_scraper search --page-url https://www.facebook.com/Nike \
+  | python -c "import json,sys; print('\n'.join(a['ad_library_id'] for a in json.load(sys.stdin)))"
 ```
 
 ## Architecture
@@ -177,6 +192,16 @@ src/meta_ads_scraper/
 | Headless | `PLAYWRIGHT_HEADLESS=0` env | `1` (headless) | Set to `0` to watch the browser during development. |
 | Verbosity | `-v` / `-vv` | 0 (WARNING) | `-v` → INFO JSON, `-vv` → DEBUG pretty console. |
 | Checkpoint DB | (not configurable) | `data/runs.sqlite` | `data/` is gitignored. Delete the file to clear history. |
+
+### Optional system tools
+
+These are not required to run the scraper but can be useful for
+post-processing output:
+
+- **`jq`** — JSON query/transformation tool. Install via your system
+  package manager (`brew install jq` / `apt install jq` /
+  `choco install jq`). All `jq` examples in this README can be
+  replaced with Python one-liners if not installed.
 
 ### Locale forcing
 
